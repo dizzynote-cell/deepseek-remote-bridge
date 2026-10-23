@@ -23,6 +23,8 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from app.config import load_config  # noqa: E402
+
 RESULTS: list[tuple[str, bool, str]] = []
 
 
@@ -77,7 +79,7 @@ def wait_task(base: str, task_id: str, limit: float = 420.0) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base", default="http://127.0.0.1:8766")
-    parser.add_argument("--workspace", default=str(ROOT / "tests" / "integration-workspace"))
+    parser.add_argument("--workspace", default=str(Path(load_config().projects_root) / "bridge-interaction-check"))
     args = parser.parse_args()
     base = args.base
     workspace = Path(args.workspace)
@@ -146,8 +148,7 @@ def main() -> int:
     approvals = [item for item in items if item.get("type") == "toolCall" and item.get("name") == "pwsh"]
     check("escalated tool ran", any("bridge-approval-ok" in str(item.get("result") or "") for item in approvals), json.dumps(approvals[-1:], ensure_ascii=False)[:300])
 
-    if len(sys.argv) > 0 and args.workspace.endswith("integration-workspace"):
-        shutil.rmtree(workspace, ignore_errors=True)
+    shutil.rmtree(workspace, ignore_errors=True)
 
     failed = [name for name, ok, _ in RESULTS if not ok]
     print(f"\n{len(RESULTS) - len(failed)}/{len(RESULTS)} checks passed", flush=True)

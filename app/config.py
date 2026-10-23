@@ -77,7 +77,7 @@ class BridgeConfig:
     local_ui: bool = True
     feishu_enabled: bool = False
     cloud_enabled: bool = False
-    voice_enabled: bool = True
+    voice_enabled: bool = False
     voice_env_file: Path | None = None
     attachments_max_bytes: int = 10 * 1024 * 1024
     attachments_max_batch_bytes: int = 30 * 1024 * 1024
@@ -304,7 +304,7 @@ def load_config(root: Path | None = None) -> BridgeConfig:
         local_ui=_env_bool(env_file, "DSH_BRIDGE_LOCAL_UI", True),
         feishu_enabled=_env_bool(env_file, "DSH_BRIDGE_FEISHU", False),
         cloud_enabled=_env_bool(env_file, "DSH_BRIDGE_CLOUD", False),
-        voice_enabled=_env_bool(env_file, "DSH_BRIDGE_VOICE", True),
+        voice_enabled=_env_bool(env_file, "DSH_BRIDGE_VOICE", False),
         voice_env_file=voice_env,
         attachments_max_bytes=_env_int(env_file, "DSH_BRIDGE_ATTACHMENT_MAX_BYTES", 10 * 1024 * 1024),
         attachments_max_batch_bytes=_env_int(
