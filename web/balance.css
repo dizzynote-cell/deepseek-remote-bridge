@@ -1,0 +1,80 @@
+/* SPDX-License-Identifier: MIT — Project: DeepSeek Remote Bridge
+ * Native DeepSeek account balance: header button plus a details panel.
+ * One currency/wallet per row; the header shows a single sum only when the
+ * recharge wallets share one currency. */
+.balance {
+  width: 168px;
+  min-width: 168px;
+  min-height: 45px;
+  padding: 7px 10px;
+  display: grid;
+  align-content: center;
+  gap: 3px;
+  text-align: left;
+}
+.balance-labels {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.balance-labels strong {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.balance-labels strong[data-balance-state] {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 500;
+}
+.balance-note {
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.balance.unavailable .balance-labels strong[data-balance-primary] { color: #e5b06a; }
+.balance.stale .balance-labels strong[data-balance-primary] { color: #a9b4c2; }
+.balance-details {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  z-index: 30;
+  width: 330px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
+  font-size: 12px;
+  color: var(--muted);
+}
+.balance-details strong { color: var(--text); display: block; margin-bottom: 6px; }
+.balance-details .balance-source { margin: 0 0 10px; }
+.balance-details .balance-hint { margin: 10px 0; line-height: 1.6; }
+.balance-details .balance-empty { margin: 8px 0; }
+.balance-table { width: 100%; border-collapse: collapse; margin: 6px 0; }
+.balance-table th, .balance-table td {
+  padding: 6px 4px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  font-weight: 500;
+}
+.balance-table th { color: var(--muted); font-size: 11px; }
+.balance-table td { color: var(--text); }
+.balance-table td.amount { text-align: right; font-variant-numeric: tabular-nums; }
+.balance-details button {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--accent);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.balance-details button:hover { background: var(--panel); }
+body.mobile-ui .balance { width: 132px; min-width: 132px; min-height: 44px; padding: 6px 8px; }
+body.mobile-ui .balance-details { width: min(310px, calc(100vw - 32px)); }

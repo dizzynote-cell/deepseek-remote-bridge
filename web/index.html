@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DeepSeek Remote Bridge</title>
+  <!-- bridge-boot -->
+  <script src="bridge-client.js?v=1"></script>
+  <link rel="stylesheet" href="styles.css?v=1">
+  <link rel="stylesheet" href="mode.css?v=1">
+  <link rel="stylesheet" href="scrollbars.css?v=1">
+  <link rel="stylesheet" href="attachments.css?v=1">
+  <link rel="stylesheet" href="projects.css?v=1">
+  <link rel="stylesheet" href="thread-browser.css?v=1">
+  <link rel="stylesheet" href="mobile.css?v=1">
+  <link rel="stylesheet" href="local-composer.css?v=1">
+  <link rel="stylesheet" href="local-polish.css?v=1">
+  <link rel="stylesheet" href="balance.css?v=1">
+  <link rel="stylesheet" href="markdown.css?v=1">
+  <link rel="stylesheet" href="interactions.css?v=1">
+  <link rel="stylesheet" href="provider-menu.css?v=1">
+</head>
+<body>
+  <main class="shell">
+    <dialog id="new-thread-dialog" class="new-thread-dialog">
+      <form id="new-thread-form" method="dialog">
+        <header><strong>新建会话</strong><button id="close-new-thread" type="button">×</button></header>
+        <div class="new-thread-kinds">
+          <label><input type="radio" name="thread-kind" value="existing" checked> 现有项目</label>
+          <label><input type="radio" name="thread-kind" value="project"> 新建项目</label>
+          <label><input type="radio" name="thread-kind" value="standalone"> 独立会话</label>
+        </div>
+        <label id="existing-project-row">项目<select id="new-thread-project"></select></label>
+        <label id="new-project-row" hidden>项目名称<input id="new-project-name" maxlength="80" placeholder="例如：桥接联调"></label>
+        <label>会话名称<input id="new-thread-title" maxlength="100" required></label>
+        <label>第一条消息<textarea id="new-thread-text" rows="4" required placeholder="输入这个会话要开始处理的内容"></textarea></label>
+        <p id="new-thread-location" class="new-thread-location"></p>
+        <footer><button id="cancel-new-thread" type="button">取消</button><button type="submit" class="primary">创建并发送</button></footer>
+      </form>
+    </dialog>
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+    <aside class="sidebar">
+      <header class="brand">
+        <div class="brand-switch">
+          <button id="provider-toggle" class="logo" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="切换后端：当前 DeepSeek Harness">D</button>
+          <div id="provider-menu" class="provider-menu" role="menu" hidden>
+            <p class="provider-menu-head">选择后端</p>
+            <button role="menuitem" class="provider-entry current" type="button" aria-current="true">
+              <span class="provider-dot"></span><span><strong>DeepSeek Harness</strong><small>当前页面 · 真实会话与账户余额</small></span>
+            </button>
+            <button role="menuitem" class="provider-entry" type="button" disabled aria-disabled="true">
+              <span class="provider-dot off"></span><span><strong>Codex</strong><small>未接入本页 · 由入口页统一切换</small></span>
+            </button>
+          </div>
+        </div>
+        <div><h1>DeepSeek Bridge</h1><p>网页、飞书与主机统一协作</p></div>
+      </header>
+      <label class="search"><span>⌕</span><input id="search" placeholder="搜索会话或项目"></label>
+      <div class="summary"><span id="count">0 个会话</span><span><button id="new-thread">新建</button><button id="refresh">刷新</button></span></div>
+      <nav id="threads" class="threads"></nav>
+      <button id="load-more" class="load-more" hidden>查看更早会话</button>
+    </aside>
+    <section class="conversation">
+      <header class="conversation-head">
+        <button id="menu" class="menu-button" aria-label="打开会话列表">会话</button>
+        <div class="conversation-title"><h2 id="title">选择一个会话</h2><p id="meta">从左侧查看 DeepSeek Harness 历史</p></div>
+        <div class="head-actions">
+          <div class="balance-wrap">
+            <button id="balance" class="balance" type="button" title="点击查看余额详情" aria-expanded="false">
+              <span class="balance-labels"><strong data-balance-primary>余额 --</strong><strong data-balance-state>读取中</strong></span>
+              <span class="balance-note" data-balance-note>账户余额</span>
+            </button>
+            <div id="balance-details" class="balance-details" hidden></div>
+          </div>
+          <div id="mode" class="mode detecting">正在检测运行时</div>
+          <div class="readonly">可输入</div>
+        </div>
+      </header>
+      <div id="messages" class="messages">
+        <div class="empty"><div class="empty-icon">↖</div><h3>选择一个会话开始工作</h3><p>这里显示的是 DeepSeek Harness 的真实会话、工具执行与终态。</p></div>
+      </div>
+      <section id="task-strip" class="task-strip" hidden></section>
+      <form id="composer" class="composer">
+        <label class="file-button" title="添加图片或轻量文件">＋<input id="files" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md"></label>
+        <textarea id="prompt" rows="1" aria-label="输入发送给 DeepSeek Harness 的内容" placeholder="输入内容，或 Ctrl+V 粘贴截图"></textarea>
+        <button id="send" type="submit">发送</button>
+      </form>
+      <div id="file-list" class="file-list" hidden></div>
+    </section>
+  </main>
+  <script src="lib/markdown-it-15.0.3.min.js"></script>
+  <script src="markdown.js?v=1"></script>
+  <script src="project-display.js?v=1"></script>
+  <script src="app.js?v=1"></script>
+  <script src="local-composer.js?v=1"></script>
+  <script src="interactions.js?v=1"></script>
+</body>
+</html>

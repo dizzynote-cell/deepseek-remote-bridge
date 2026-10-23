@@ -1,0 +1,61 @@
+/* SPDX-License-Identifier: MIT — Project: DeepSeek Remote Bridge
+ * The top-left logo doubles as the backend switch entry point required by the
+ * two-bridge integration contract. Only reachable targets are enabled. */
+.brand-switch { position: relative; display: flex; }
+button.logo {
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 800;
+  color: #06130e;
+}
+button.logo:focus-visible,
+.provider-entry:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.provider-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  left: 0;
+  z-index: 40;
+  width: 288px;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--panel2);
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .45);
+}
+.provider-menu-head {
+  margin: 2px 6px 8px;
+  color: var(--muted);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+.provider-entry {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.provider-entry:hover:not(:disabled) { background: var(--panel); }
+.provider-entry:disabled { cursor: not-allowed; opacity: .55; }
+.provider-entry.current { background: #16241d; }
+.provider-entry span strong { display: block; font-size: 13px; }
+.provider-entry span small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+.provider-dot {
+  flex: 0 0 auto;
+  width: 9px;
+  height: 9px;
+  margin-top: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.provider-dot.off { background: #4a515c; }
+body.mobile-ui .provider-menu { width: min(280px, calc(100vw - 40px)); }

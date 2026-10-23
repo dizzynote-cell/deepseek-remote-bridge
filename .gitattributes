@@ -1,0 +1,6 @@
+# Normalize line endings; keep Windows launchers CRLF so cmd.exe is happy.
+* text=auto eol=lf
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.png binary
+*.ico binary

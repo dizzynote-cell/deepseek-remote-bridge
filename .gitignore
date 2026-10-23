@@ -1,0 +1,57 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 xiyannan
+# Project: DeepSeek Remote Bridge
+
+# --- runtime state, never committed ---------------------------------------
+state/
+data-home/
+logs/
+*.log
+runtime/
+uploads/
+cache/
+*.token
+*.sqlite
+*.sqlite3
+
+# --- local configuration and secrets -------------------------------------
+config/.env
+.env
+.env.*
+!.env.example
+!config/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*
+.credentials.yaml
+.dsh/
+.codex/
+secrets/
+
+# --- generated or transient ----------------------------------------------
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+test-results/
+integration-workspace/
+playwright-report/
+
+# --- editor and OS noise --------------------------------------------------
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+Desktop.ini
+.DS_Store
+
+# --- local notes that must not ship --------------------------------------
+BASELINE_FILES.txt
+spike/
+notes/
+TODO.local.md
