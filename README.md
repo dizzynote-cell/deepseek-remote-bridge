@@ -5,7 +5,7 @@
 这是 [Codex Remote Bridge](https://github.com/dizzynote-cell/codex-remote-bridge)（MIT）的**独立适配项目**：复用它的网页外观、Markdown 渲染、附件策略和桥接思路，执行层则按 DeepSeek Harness 自己的官方 SDK 协议重新实现。**不是 DeepSeek 官方产品**，也不修改、不打包 DeepSeek Harness 安装目录。
 
 - 版本：见 [`VERSION`](VERSION)
-- 许可：MIT，保留原作者与上游项目归属（见 [`LICENSE`](LICENSE)）
+- 许可：MIT，保留原作者与上游项目归属（见 [`LICENSE`](LICENSE)、[`NOTICE.md`](NOTICE.md)）
 
 ---
 
