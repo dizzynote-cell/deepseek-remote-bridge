@@ -61,7 +61,19 @@ python tests\run_tests.py
 
 - 1440×900：侧栏按项目分组列出真实会话，右上角显示真实余额与「原生账户 / 更新于 …」，状态条显示当前路由与权限预设。
 - `?thread=<id>` 深链：直接打开会话，用户消息、附件提示、`read`/`read_image` 工具卡片、推理折叠卡、用量与最终回答都正确渲染。
-- 390×844：自动切到紧凑抽屉布局（`mobile-ui` 由视口宽度与 UA 共同决定），侧栏可收起，输入区可用。
+- 左上角 LOGO 菜单：当前项 DeepSeek Harness 高亮，Codex 项置灰禁用（`aria-disabled="true"`），无 href。
+- 余额面板：充值钱包与赠送钱包分行、币种、金额、来源、更新时间与「刷新余额」按钮。
+- 390×844（CDP 设备模拟，DPR 2）：自动切到紧凑抽屉布局（`mobile-ui` 由视口宽度与 UA 共同决定），`scrollWidth == clientWidth == 390`，没有横向溢出；侧栏可收起，输入区可用。
+
+## 发布物验证
+
+从 GitHub 全新 clone（`0fd44ba…`），只补一个未跟踪的 `config/.env`，然后：
+
+1. 不写配置直接启动 → 退出码 2，提示设置 `DSH_EXE` / `DSH_CLI`（错误路径可用）。
+2. 补配置后启动 → `/api/health` `ok:true`，运行时与适配器均可用。
+3. `python tests\run_tests.py` → 70 个 Python 用例 + 2 个 Node 用例全部通过。
+4. `python tests\live_check.py --phase create` → 10/10，真实会话与真实工具落盘。
+5. `/api/bridge-info` 的 `capabilities.voice` 在未实现语音时为 `false`（不夸大能力）。
 
 ## 未覆盖 / 未实现
 
