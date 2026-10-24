@@ -49,6 +49,77 @@ function Get-BridgePidFile {
   return (Join-Path $Root 'state/bridge.pid')
 }
 
+function Get-TrayPidFile {
+  param([string]$Root)
+  return (Join-Path $Root 'state/tray.pid')
+}
+
+function Test-TrayProcess {
+  param([int]$ProcessId, [string]$Root)
+  if (-not $ProcessId) { return $null }
+  $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
+  if (-not $process) { return $null }
+  $executable = [string]$process.ExecutablePath
+  if ([string]::IsNullOrWhiteSpace($executable) -or $executable -notmatch '(?i)powershell') { return $null }
+  $expected = (Join-Path $Root 'scripts/tray.ps1') -replace '\\', '/'
+  $normalized = [string]$process.CommandLine -replace '\\', '/'
+  if ($normalized -like "*$expected*") { return $process }
+  return $null
+}
+
+function Get-RunningTray {
+  param([string]$Root)
+  $pidFile = Get-TrayPidFile $Root
+  if (-not (Test-Path $pidFile)) { return $null }
+  $saved = (Get-Content $pidFile -ErrorAction SilentlyContinue | Select-Object -First 1)
+  if (-not $saved) { return $null }
+  $process = Test-TrayProcess -ProcessId ([int]$saved) -Root $Root
+  if ($process) { return $process }
+  Remove-Item $pidFile -Force -ErrorAction SilentlyContinue
+  return $null
+}
+
+function Start-Tray {
+  param([string]$Root, [switch]$Quiet)
+  $existing = Get-RunningTray $Root
+  if ($existing) {
+    Write-Host "托盘已在运行（PID $($existing.ProcessId)）。"
+    return
+  }
+  $tray = Join-Path $Root 'scripts/tray.ps1'
+  if (-not (Test-Path $tray)) { throw "找不到托盘脚本：$tray" }
+  # Detached: the tray must outlive this launcher, and WMI creation leaves no
+  # inherited console handles behind.
+  $hiddenFlag = if ($Quiet) { ' -Hidden' } else { '' }
+  $commandLine = 'powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"{1}' -f $tray, $hiddenFlag
+  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine = $commandLine
+    CurrentDirectory = $Root
+  }
+  if (-not $created -or -not $created.ProcessId) { throw '无法启动托盘进程。' }
+  Set-Content -Path (Get-TrayPidFile $Root) -Value $created.ProcessId -Encoding ascii
+  Start-Sleep -Milliseconds 800
+  $process = Test-TrayProcess -ProcessId ([int]$created.ProcessId) -Root $Root
+  if ($process) {
+    Write-Host "托盘已启动（PID $($created.ProcessId)）。"
+  } else {
+    Write-Host "托盘进程启动后立即退出；查看 $Root\state\logs\tray.log 或直接运行 scripts\tray.ps1 看报错。"
+  }
+}
+
+function Stop-Tray {
+  param([string]$Root)
+  $process = Get-RunningTray $Root
+  if (-not $process) {
+    Write-Host '托盘未在运行。'
+    Remove-Item (Get-TrayPidFile $Root) -Force -ErrorAction SilentlyContinue
+    return
+  }
+  Stop-Process -Id $process.ProcessId -Force -ErrorAction SilentlyContinue
+  Remove-Item (Get-TrayPidFile $Root) -Force -ErrorAction SilentlyContinue
+  Write-Host "托盘已停止（PID $($process.ProcessId)）。"
+}
+
 function Test-BridgeProcess {
   param([int]$ProcessId, [string]$Root)
   if (-not $ProcessId) { return $null }

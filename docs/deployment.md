@@ -47,6 +47,9 @@ handle /dsh/* {
 .\scripts\watchdog.ps1          # 健康检查失败时重启（只重启自己的进程）
 .\scripts\install-autostart.ps1 # 开机启动快捷方式（可 -Remove）
 powershell -STA -File .\scripts\tray.ps1   # 托盘：状态/打开/启动/停止/重启/退出
+.\scripts\start-tray.ps1        # 只启动托盘（图标 + 菜单）
+.\scripts\stop-tray.ps1         # 只移除托盘（桥继续跑）
+.\scripts\show-tray-settings.ps1 # 打开 Windows 任务栏图标设置
 ```
 
 要点：

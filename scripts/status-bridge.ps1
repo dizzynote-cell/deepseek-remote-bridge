@@ -1,10 +1,18 @@
 ﻿# SPDX-License-Identifier: MIT
 # Copyright (c) 2026 xiyannan — Project: DeepSeek Remote Bridge
-# Report the bridge process, URL and health without changing anything.
+# Report the bridge process, URL, health and tray state without changing anything.
 . (Join-Path $PSScriptRoot 'bridge-common.ps1')
 $root = Get-BridgeRoot
 $process = Get-RunningBridge $root
+$tray = Get-RunningTray $root
 $url = Get-BridgeUrl $root
+
+if ($tray) {
+  Write-Host "托盘进程：PID $($tray.ProcessId)"
+} else {
+  Write-Host '托盘进程：未运行（scripts\start-tray.ps1 可启动）'
+}
+
 if (-not $process) {
   Write-Host "桥未运行。期望地址：$url"
   exit 1

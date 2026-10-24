@@ -1,5 +1,17 @@
 # 更新日志
 
+## 1.2.0 — 2026-10-24
+
+托盘图标真正接进启动链路，并补上「图标被 Windows 收进溢出区」的处理。
+
+- `start-bridge.ps1` 与 `DeepSeek Remote Bridge.cmd` 启动桥后自动带起托盘；`scripts/start-tray.ps1`、`stop-tray.ps1` 可单独管理。
+- 托盘图标改为运行时绘制的绿色圆角 **D**（不随仓库分发二进制）；双击打开页面；菜单新增「打开日志目录」「任务栏显示设置…」。
+- 托盘写 `state/logs/tray.log`：启动、图标创建、状态变化、退出都有记录，便于排查「没有角标」。
+- `state/tray.pid` + 进程身份校验（PowerShell + 绝对 `tray.ps1` 路径），与桥的 PID 规则一致，不会误杀 Codex 桥。
+- `scripts/show-tray-settings.ps1` 打印固定步骤并打开 Windows 任务栏设置。
+- `status-bridge.ps1` 同时报告托盘状态。
+- Windows 10 默认把新图标放进 `^` 溢出区，这是系统行为；文档与脚本给出固定方法。
+
 ## 1.1.1 — 2026-10-24
 
 补上两项此前只有设计没有实测的行为，并把结果写进验证记录。

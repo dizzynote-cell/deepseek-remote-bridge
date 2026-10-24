@@ -106,6 +106,14 @@ powershell -STA -File .\scripts\tray.ps1   # 托盘菜单
 
 桥进程在端口绑定成功后自己写 `state/bridge.pid`，退出时只删除自己的记录；脚本按「Python + 命令行里的绝对 `bridge.py` 路径」识别进程，手动用相对路径启动的桥不会被脚本管理，**也不会误杀同机的 Codex 桥**。
 
+托盘（通知区域）说明：
+
+- `start-bridge.ps1`、`DeepSeek Remote Bridge.cmd` 会自动带起托盘；`scripts\start-tray.ps1` 可以单独启动。
+- 图标是绿色圆角 **D**，右键菜单：状态 / 打开页面 / 打开日志目录 / 任务栏显示设置 / 启动 / 停止 / 重启 / 退出托盘；双击打开页面。
+- Windows 10 默认把**新**的通知区域图标放进 `^` 溢出区：点 `^` 找到绿色 D，拖到任务栏即可固定；或运行 `scripts\show-tray-settings.ps1` 打开任务栏设置。
+- 全屏游戏/视频会连任务栏一起遮住，退出全屏再看。
+- 托盘只按 `state/bridge.pid` 里记录的进程操作，不会碰 Codex 桥或其他 Python。
+
 ### 第一次验证
 
 1. 左侧能看到真实会话列表（按工作目录分组）。
