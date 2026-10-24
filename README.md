@@ -87,12 +87,12 @@ python bridge.py                 # 前台运行，Ctrl+C 停止
 .\scripts\install-shortcuts.ps1 -Remove             # 两个都删掉
 ```
 
-- 桌面快捷方式叫 **DeepSeek Remote Bridge**，图标是蓝色 D（`assets/bridge.ico`）；
+- 桌面快捷方式叫 **DeepSeek Remote Bridge**，图标与页面左上角一致（`assets/bridge.ico`）；
   双击后隐藏窗口启动桥和托盘，再打开页面；已经在运行就只打开页面。
 - 开机启动用的是当前用户的「启动」文件夹快捷方式（登录后运行），与你 Codex 桥的启动项互不影响。
 - 安装向导最后会问一次，默认两个都建。
 
-- 托盘是绿色圆角 **D**，右键可看状态、打开页面/日志、启动/停止/重启，双击打开页面。
+- 托盘是鲸鱼图标（`assets/bridge.ico`），右键可看状态、打开页面/日志、启动/停止/重启，双击打开页面。
 - Windows 10 默认把新图标放进 `^` 溢出区：点 `^` 找到 D 拖到任务栏，或运行
   `.\scripts\show-tray-settings.ps1`。
 - 启动脚本只按 `state/bridge.pid` 管理自己的进程，**不会碰同机的 Codex 桥**。

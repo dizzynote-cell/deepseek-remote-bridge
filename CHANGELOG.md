@@ -1,5 +1,18 @@
 # 更新日志
 
+## 1.6.1 — 2026-10-25
+
+换成自己的鲸鱼 Logo。
+
+- 页面左上角的方形标记从"字母 D"换成图片（`web/logo-64.png`）。
+- 同一套图生成 PWA 图标：`icon-192.png`、`icon-512.png`、`icon-maskable-512.png`（蓝底安全区）、
+  `apple-touch-icon.png`（蓝底，避免 iOS 透明处变黑）、`favicon-32.png`。
+- 托盘不再画字母：优先加载 `assets/bridge.ico`（16/32/48/64/256 多尺寸），缺失时才回退到绘制；
+  回退色也从绿色改成 DeepSeek 蓝。
+- 桌面快捷方式与开机启动项指向同一个 `.ico`，重建后已刷新图标缓存。
+- `/favicon.ico` 与 `/apple-touch-icon.png` 不再固定回退到 SVG：前者优先送 `favicon-32.png`，后者直接送 PNG。
+- 母版图存为 `assets/logo.png`，方便以后重新生成各尺寸。
+
 ## 1.6.0 — 2026-10-25
 
 余额旁边多了"闲时/忙时"。

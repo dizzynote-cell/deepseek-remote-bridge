@@ -25,7 +25,19 @@ function Write-TrayLog {
 }
 Write-TrayLog ("start pid={0} hidden={1}" -f $PID, $Hidden)
 
-# Brand icon drawn at runtime, so no binary asset is shipped.
+# Prefer the packaged brand icon; fall back to a drawn mark if it is missing.
+function Get-BridgeTrayIcon {
+  $iconPath = Join-Path $root 'assets\bridge.ico'
+  if (Test-Path -LiteralPath $iconPath) {
+    try {
+      return @{ Icon = (New-Object System.Drawing.Icon($iconPath)); Bitmap = $null; Font = $null; Brush = $null; Path = $null }
+    } catch {
+      Write-TrayLog ("icon load failed: " + $_.Exception.Message)
+    }
+  }
+  return (New-BridgeTrayIcon)
+}
+
 function New-BridgeTrayIcon {
   $size = 32
   $bitmap = New-Object System.Drawing.Bitmap $size, $size
@@ -34,8 +46,8 @@ function New-BridgeTrayIcon {
   $graphics.Clear([System.Drawing.Color]::Transparent)
   $start = New-Object System.Drawing.Point 0, 0
   $end = New-Object System.Drawing.Point $size, $size
-  $from = [System.Drawing.Color]::FromArgb(255, 87, 217, 154)
-  $to = [System.Drawing.Color]::FromArgb(255, 36, 138, 103)
+  $from = [System.Drawing.Color]::FromArgb(255, 77, 107, 254)
+  $to = [System.Drawing.Color]::FromArgb(255, 47, 73, 201)
   $brush = New-Object System.Drawing.Drawing2D.LinearGradientBrush($start, $end, $from, $to)
   $radius = 9
   $diameter = $radius * 2
@@ -57,7 +69,7 @@ function New-BridgeTrayIcon {
   return @{ Icon = $icon; Bitmap = $bitmap; Font = $font; Brush = $brush; Path = $path }
 }
 
-$assets = New-BridgeTrayIcon
+$assets = Get-BridgeTrayIcon
 
 $notify = New-Object System.Windows.Forms.NotifyIcon
 $notify.Icon = $assets.Icon
@@ -139,7 +151,7 @@ if (-not $Hidden) {
   $notify.ShowBalloonTip(
     6000,
     'DeepSeek Remote Bridge',
-    "托盘图标已启动（绿色 D）。若任务栏没有直接显示，点任务栏的 ^ 展开并把它拖到任务栏。`n$url",
+    "托盘图标已启动（鲸鱼图标）。若任务栏没有直接显示，点任务栏的 ^ 展开并把它拖到任务栏。`n$url",
     [System.Windows.Forms.ToolTipIcon]::Info
   )
 }
@@ -152,7 +164,8 @@ $timer.Stop()
 $timer.Dispose()
 $notify.Visible = $false
 $notify.Dispose()
-$assets.Bitmap.Dispose()
-$assets.Font.Dispose()
-$assets.Brush.Dispose()
-$assets.Path.Dispose()
+$assets.Icon.Dispose()
+if ($assets.Bitmap) { $assets.Bitmap.Dispose() }
+if ($assets.Font) { $assets.Font.Dispose() }
+if ($assets.Brush) { $assets.Brush.Dispose() }
+if ($assets.Path) { $assets.Path.Dispose() }

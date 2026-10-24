@@ -165,8 +165,16 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         if relative == "/api" or relative.startswith("/api/"):
             self._route_api(method, relative, query)
             return
-        if relative in {"/favicon.ico", "/apple-touch-icon.png"}:
-            self._serve_file(self.config.web_dir / "favicon.svg", download=False)
+        if relative == "/favicon.ico":
+            # Browsers still probe the legacy path; prefer the PNG icon and fall
+            # back to the vector one when an install has no PNG.
+            png = self.config.web_dir / "favicon-32.png"
+            legacy = self.config.web_dir / "favicon.svg"
+            target = png if png.is_file() else legacy
+            if target.is_file():
+                self._serve_file(target, download=False)
+                return
+            self._error(404, "favicon not found", "not_found")
             return
         self._serve_static(relative)
 
