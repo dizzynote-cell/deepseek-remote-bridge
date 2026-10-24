@@ -220,6 +220,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/preferences":
                 self._json(state.preferences.snapshot())
                 return
+            if path == "/api/permissions":
+                self._api_permissions(query)
+                return
             if path == "/api/voice/config":
                 self._json({**state.voice.public(), "preferences": state.preferences.snapshot()})
                 return
@@ -239,6 +242,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/preferences":
                 self._api_preferences()
+                return
+            if path == "/api/permissions":
+                self._api_set_permission()
                 return
             if path == "/api/voice/request":
                 self._api_voice_request()
@@ -322,6 +328,64 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         files = self.state.returned_files.collect(texts)
         if files:
             thread["bridgeAttachments"] = files
+
+    # -- permissions -----------------------------------------------------
+    def _api_permissions(self, query: dict[str, list[str]]) -> None:
+        state = self.state
+        session_id = _first(query, "threadId") or None
+        try:
+            payload = state.catalog.adapter.permissions(session_id)
+        except AdapterError as error:
+            self._error(502, f"读取权限预设失败：{error}", "adapter_error")
+            return
+        preferences = state.preferences.snapshot()
+        self._json(
+            {
+                "options": payload.get("options") or [],
+                "defaultPreset": payload.get("defaultPreset"),
+                "current": payload.get("current"),
+                "bridgeDefault": preferences.get("permissionPreset") or state.config.permission_preset,
+                "threadId": session_id,
+            }
+        )
+
+    def _api_set_permission(self) -> None:
+        state = self.state
+        try:
+            payload = self._read_json()
+        except ValueError as error:
+            self._error(400, str(error), "bad_request")
+            return
+        preset = str(payload.get("preset") or "").strip()
+        session_id = str(payload.get("threadId") or "").strip()
+        if not preset:
+            self._error(400, "缺少权限预设", "missing_preset")
+            return
+        try:
+            catalog = state.catalog.adapter.permissions(None)
+        except AdapterError as error:
+            self._error(502, f"读取权限预设失败：{error}", "adapter_error")
+            return
+        known = {str(option.get("value")) for option in catalog.get("options") or [] if isinstance(option, dict)}
+        if preset not in known:
+            self._error(400, "该权限预设不在当前运行时的可选列表中", "unknown_preset")
+            return
+        if not session_id:
+            state.preferences.update({"permissionPreset": preset})
+            self._json({"ok": True, "bridgeDefault": preset})
+            return
+        try:
+            state.tasks.ensure_open(session_id)
+            payload = state.catalog.adapter.set_permission(session_id, preset)
+        except TaskRejected as error:
+            self._error(error.http_status, str(error), error.code)
+            return
+        except AdapterError as error:
+            status = error.status if 400 <= error.status < 600 else 502
+            self._error(status, f"切换权限失败：{error}", "adapter_error")
+            return
+        state.catalog.invalidate(session_id)
+        self._json({"ok": True, "current": payload.get("current"), "preset": preset})
 
     # -- preferences and voice ------------------------------------------
     def _api_preferences(self) -> None:
@@ -448,9 +512,12 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                 if not _path_allowed(state, Path(cwd)):
                     raise TaskRejected("该目录不在桥允许的工作区列表内", code="cwd_forbidden", status=403)
                 session_id = f"session-{uuid.uuid4()}"
+                preset = str(payload.get("permissionPreset") or "").strip()
+                if not preset:
+                    preset = str(state.preferences.snapshot().get("permissionPreset") or state.config.permission_preset)
                 staged, images = state.attachments.stage(session_id, files)
                 blocks = _content_blocks(text + state.attachments.prompt_suffix(staged), images)
-                task = state.tasks.create_session(cwd, blocks, session_id=session_id)
+                task = state.tasks.create_session(cwd, blocks, session_id=session_id, preset=preset or None)
                 if title:
                     task.detail["title"] = title
                 self._json({"taskId": task.id, "threadId": task.session_id})

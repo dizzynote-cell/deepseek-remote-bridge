@@ -142,6 +142,7 @@ class BridgeState:
             "attachments": True,
             "approvals": True,
             "userQuestions": True,
+            "permissionSwitch": True,
             "voice": bool(self.voice.available and self.preferences.snapshot().get("voiceEnabled", True)),
             "billing": "balance",
             "modelSelection": False,

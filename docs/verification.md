@@ -29,13 +29,13 @@ python tests\run_tests.py
 | `test_attachments.py` | 10 | 文档落盘、图片内联、单文件/单批限制、非法 base64、路径逃逸、清理、返回文件白名单 |
 | `test_interactions.py` | 9 | 批准/提问整形、accept→`allowed-once`、拒绝、选项与自定义回答、空回答拒绝、revision、适配器失败 |
 | `test_tasks.py` | 9 | 占用→409 且不重发、发送失败不重试、resume 一次、终态映射、消息 ID 定位 turn、未完成标中断 |
-| `test_server.py` | 15 | 根/前缀挂载、前缀外 404、302、运行中标红、turn 裁剪、跨站写拒绝、目录穿越、CSRF、语音与偏好接口 |
+| `test_server.py` | 18 | 根/前缀挂载、前缀外 404、302、运行中标红、turn 裁剪、跨站写拒绝、目录穿越、CSRF、语音与偏好接口 |
 | `test_voice.py` | 18 | 与页面一致的缓存键、配置解析、未配置/关闭时拒绝、空文本与超长、缓存命中、非法键、缓存目录边界、偏好持久化 |
 | `test_public_distribution.py` | 7 | 私有路径/密钥/会话 ID 扫描、二进制排除、必需文件、`.gitignore`、许可与归属 |
 | `test_markdown.cjs` | 1 | 表格、代码、流式片段、危险链接与原始 HTML 转义 |
 | `test_ui_contract.cjs` | 1 | 资源存在、全部请求走基址、余额替代额度、LOGO 菜单与禁用项、语音按钮与密钥不外泄 |
 
-合计：95 个 Python 用例 + 2 个 Node 用例（含 PWA 与配色检查）。
+合计：102 个 Python 用例 + 2 个 Node 用例（含 PWA、配色、权限与计划投影）。
 
 ## 真实联调
 
@@ -45,6 +45,7 @@ python tests\run_tests.py
 | `live_check.py --phase resume` | 5/5 | 桥重启后同一会话仍可读、可 `resume`、第二轮完成、历史 1→2 轮 |
 | `live_interactions.py` | 11/11 | `ask_user_question` 到桥、回答回填、模型按所选值写文件；沙箱升级批准到桥、批准后工具真的执行；批准审计事件出现在历史 |
 | `live_attachments.py` | 6/6 | 图片作为 image block 被模型理解（回答 green）、文本文档被模型读取（回答 magic 值）、上传落在桥目录 |
+| `live_permissions.py` | 13/13 | 预设目录、会话内切换并写入 `permission/preset`/`sandbox/mode`、未知预设 400、新建会话即带预设、`todo_write` 计划与完成度、计划卡进入历史 |
 | `live_parallel.py` | 18/18 | 两个会话同时运行且都出现在运行列表中、各自落盘、各自完成；空闲会话的后续输入 `steered:false`；运行中的第二个输入 `steered:true` 且两条都完成 |
 | `live_files.py` | 6/6 | 生成的 `.md` 与 `.csv` 作为返回文件出现、下载 200 且类型正确、白名单外的路径 403、白名单外的目录 403 |
 | `live_ownership.py` | 6/6 | 第二个 Harness 运行时持有会话时桥返回 `409 session_busy`、未写入内容、历史仍可读、对方退出后恢复 |
@@ -68,6 +69,8 @@ python tests\run_tests.py
 - `?thread=<id>` 深链：直接打开会话，用户消息、附件提示、`read`/`read_image` 工具卡片、推理折叠卡、用量与最终回答都正确渲染。
 - 左上角 LOGO 菜单：当前项 DeepSeek Harness 高亮，Codex 项置灰禁用（`aria-disabled="true"`），无 href。
 - 余额面板：充值钱包与赠送钱包分行、币种、金额、来源、更新时间与「刷新余额」按钮。
+- 计划与实时状态：`todo_write` 渲染为计划卡（4/4 完成），表头显示「计划 4/4」，运行中显示「第 2 轮 · 正在运行 write · 已调用工具 2 次 · 计划 4/5 · 已用时 4 秒」。
+- 输入框左侧出现「权限」选择器，切换后会话日志写入 `permission/preset` 与 `sandbox/mode`。
 - 390×844（CDP 设备模拟，DPR 2）：自动切到紧凑抽屉布局（`mobile-ui` 由视口宽度与 UA 共同决定），`scrollWidth == clientWidth == 390`，没有横向溢出；侧栏可收起，输入区可用。
 
 ## 语音（1.1.0 新增，实测）
@@ -89,7 +92,7 @@ python tests\run_tests.py
 
 1. 不写配置直接启动 → 退出码 2，提示设置 `DSH_EXE` / `DSH_CLI`（错误路径可用）。
 2. 补配置后启动 → `/api/health` `ok:true`，运行时与适配器均可用。
-3. `python tests\run_tests.py` → 当时 70 个 Python 用例 + 2 个 Node 用例全部通过（1.3.0 为 95 + 2）。
+3. `python tests\run_tests.py` → 当时 70 个 Python 用例 + 2 个 Node 用例全部通过（1.4.0 为 102 + 2）。
 4. `python tests\live_check.py --phase create` → 10/10，真实会话与真实工具落盘。
 5. `/api/bridge-info` 的 `capabilities.voice` 与实际实现一致（未配置时为 `false`）。
 

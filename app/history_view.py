@@ -119,6 +119,9 @@ class TranscriptProjector:
         self.user_sequence: list[dict[str, Any]] = []
         self._active_turn: int = 0
         self.effective_cwd: str | None = None
+        self.todos: list[dict[str, Any]] = []
+        self.tool_names: dict[str, str] = {}
+        self.activity: dict[str, Any] = {}
 
     def _turn(self, number: int) -> TurnAccumulator:
         if number not in self.turns:
@@ -145,6 +148,10 @@ class TranscriptProjector:
             "bridgeProvider": (self.model or {}).get("provider"),
             "bridgeModel": (self.model or {}).get("model"),
             "bridgeAgentPreset": self.header.get("agentPreset"),
+            "bridgeTodos": self.todos,
+            "bridgeTodosDone": sum(1 for item in self.todos if item.get("status") == "completed"),
+            "bridgeTodosTotal": len(self.todos),
+            "bridgeActivity": self._activity_summary(turns),
         }
 
     # -- individual events ---------------------------------------------
@@ -293,6 +300,56 @@ class TranscriptProjector:
                 "outcome": data.get("outcome"),
             }
         )
+
+    def _on_todo_write(self, event: dict[str, Any]) -> None:
+        data = event.get("data") or {}
+        todos = []
+        for item in data.get("todos") or []:
+            if not isinstance(item, dict):
+                continue
+            content = str(item.get("content") or "").strip()
+            if not content:
+                continue
+            status = str(item.get("status") or "pending")
+            if status not in {"pending", "in_progress", "completed"}:
+                status = "pending"
+            todos.append({"content": content, "status": status})
+        if not todos:
+            return
+        self.todos = todos
+        number = self._active_turn
+        if number > 0:
+            # One plan card per turn: the model rewrites the list as it advances,
+            # and the transcript should show the latest state, not every revision.
+            turn = self._turn(number)
+            turn.items = [item for item in turn.items if item.get("type") != "todo"]
+            turn.items.append({"type": "todo", "todos": [dict(item) for item in todos]})
+
+    def _activity_summary(self, turns: list[dict[str, Any]]) -> dict[str, Any]:
+        """Describe the live step from events only: no invented progress."""
+        if not turns:
+            return {"running": False}
+        last = self.turns[max(self.turns)] if self.turns else None
+        if last is None:
+            return {"running": False}
+        running = last.status == "in_progress"
+        tools = [item for item in last.items if item.get("type") == "toolCall"]
+        current = next((item.get("name") for item in reversed(tools) if item.get("status") == "running"), None)
+        steps = 0
+        for item in last.items:
+            if item.get("type") == "toolCall":
+                steps += 1
+        return {
+            "running": running,
+            "turn": last.number,
+            "turnId": f"turn-{last.number}",
+            "startedAt": last.started_at,
+            "endedAt": last.ended_at,
+            "tools": len(tools),
+            "currentTool": current,
+            "todosDone": sum(1 for item in self.todos if item.get("status") == "completed"),
+            "todosTotal": len(self.todos),
+        }
 
     def _on_session_title(self, event: dict[str, Any]) -> None:
         data = event.get("data") or {}

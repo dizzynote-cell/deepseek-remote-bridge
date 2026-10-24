@@ -21,6 +21,9 @@ class FakeTasks:
     def is_running(self, session_id):
         return session_id == "session-running"
 
+    def ensure_open(self, session_id):
+        return None
+
     def active_task_for(self, session_id):
         return None
 
@@ -28,8 +31,34 @@ class FakeTasks:
         return None
 
 
+class FakePermissionAdapter:
+    options = [
+        {"value": "workspace-write", "name": "workspace-write", "description": "写工作区"},
+        {"value": "danger-full-access", "name": "danger-full-access", "description": "完全权限"},
+    ]
+    current_by_session = {}
+
+    def permissions(self, session_id=None):
+        return {
+            "options": list(self.options),
+            "defaultPreset": "workspace-write",
+            "current": self.current_by_session.get(session_id) if session_id else None,
+        }
+
+    def set_permission(self, session_id, preset):
+        if preset not in {option["value"] for option in self.options}:
+            from app.dsh_adapter import AdapterError
+
+            raise AdapterError("unknown preset", status=400)
+        self.current_by_session[session_id] = preset
+        return {"current": preset}
+
+
 class FakeCatalog:
     last_error = ""
+
+    def __init__(self):
+        self.adapter = FakePermissionAdapter()
 
     def rows(self, project_filter=None, limit=50, offset=0):
         return [
@@ -61,6 +90,9 @@ class FakeCatalog:
         }
 
     def known(self, session_id):
+        return None
+
+    def invalidate(self, session_id=None):
         return None
 
 
@@ -251,6 +283,44 @@ class HttpSurfaceTests(unittest.TestCase):
     def test_static_traversal_is_blocked(self):
         _, port = self.build()
         self.assertEqual(get(f"http://127.0.0.1:{port}/..%2f..%2fetc%2fpasswd")[0], 404)
+
+    def test_permission_catalog_and_switch(self):
+        _, port = self.build()
+        status, body, _ = get(f"http://127.0.0.1:{port}/api/permissions")
+        payload = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual([option["value"] for option in payload["options"]], ["workspace-write", "danger-full-access"])
+        self.assertEqual(payload["bridgeDefault"], "workspace-write")
+
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/permissions",
+            method="POST",
+            payload={"threadId": "session-demo", "preset": "danger-full-access"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["current"], "danger-full-access")
+        status, body, _ = get(f"http://127.0.0.1:{port}/api/permissions?threadId=session-demo")
+        self.assertEqual(json.loads(body)["current"], "danger-full-access")
+
+    def test_permission_rejects_unknown_preset(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/permissions",
+            method="POST",
+            payload={"threadId": "session-demo", "preset": "root"},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["code"], "unknown_preset")
+
+    def test_permission_without_thread_updates_the_default(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/permissions",
+            method="POST",
+            payload={"preset": "danger-full-access"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["bridgeDefault"], "danger-full-access")
 
     def test_manifest_is_served_with_the_manifest_type(self):
         (self.web / "manifest.webmanifest").write_text("{}", encoding="utf-8")

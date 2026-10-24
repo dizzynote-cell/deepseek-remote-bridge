@@ -14,8 +14,8 @@
 | `session/prompt`（文本 + 内联图片） | 已用，图片转 durable 附件 | 无 |
 | `session/resume` | 已用，被占用时 409 | 无 |
 | `session/wait` | 已用，作为终态判定的一半 | 无 |
-| `session/working-directory/get` / `set` | 只在新建会话时 `set` | **页面里不能切换工作目录**（会话中途换目录） |
-| `session.event`（全量事件） | 投影出文本/推理/工具/批准/用量 | **未展示**：`subagent.started/finished`、`job/registered|settled`、`todo/write`、`goal/change`、`step/*`、`request/context`、`agent/error` |
+| `session/working-directory/get` / `set` | 只在新建会话时 `set` | 页面里还不能在会话中途切换工作目录 |
+| `session.event`（全量事件） | 文本/推理/工具/批准/用量 + `todo/write` 计划 + 实时状态（step/tool/用时） | 仍未展示：`subagent.*`、`job/*`、`goal/change`、`request/context`、`agent/error` |
 | `session.status` | 已用 | 无 |
 | `subagent.started/finished` | 忽略（仅写入通知缓冲） | **子代理过程不可见**——长任务里最需要的进度之一 |
 | `shutdown` | 已用 | 无 |
@@ -27,9 +27,12 @@
 
 1. 子代理卡片：`subagent.started/finished` 的 `parentSessionId/childSessionId/status/lastAssistantMessage`。
 2. 后台任务进度：`job/registered` → `job/settled` 的 `label/startedAt/finishedAt/status/detail`（长命令时最有用）。
-3. 任务清单：`todo/write` 渲染成清单，`goal/change` 显示目标与轮次。
+3. 目标与轮次：`goal/change` 显示目标、阶段与已用轮次。
 4. 上下文用量：`request/context`（contextWindow）+ `assistant/message.usage` 已有，可加「上下文占用」条。
 5. 工作目录切换：`session/working-directory/set` + 页面入口（带白名单校验）。
+
+已完成：`todo/write` 计划清单与完成度、实时状态条（轮次/当前工具/工具次数/用时）、
+会话内权限预设切换（`permission/preset` + `sandbox/mode` 写入 Harness 日志）。
 
 ## 2. 手机控制才暴露的产品缺口
 
@@ -55,10 +58,10 @@
 
 **P1（体验补齐，工作量小）**
 
-4. 子代理 + 后台任务 + todo 的可视化（纯前端，数据已经在 `session.event` 里）。
+4. 子代理 + 后台任务的可视化（纯前端，数据已经在 `session.event` 里；计划/实时状态已完成）。
 5. 工作目录切换（一个 `set` 调用 + 白名单校验）。
 6. 重启后任务状态恢复（把 running 任务标记为"已中断，需重发"，而不是静默变空闲）。
-7. 会话搜索走服务端（`sessionQuery` 已支持按标题/文本过滤）。
+7. 搜索走服务端（`sessionQuery` 已支持按标题/文本过滤）。
 
 **P2（可选）**
 

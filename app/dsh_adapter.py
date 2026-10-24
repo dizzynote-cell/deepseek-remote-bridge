@@ -81,6 +81,19 @@ class AdapterClient:
         quoted = urllib.parse.quote(session_id, safe="")
         return self._request("GET", f"/session/{quoted}", timeout=90.0)
 
+    # -- permissions ----------------------------------------------------
+    def permissions(self, session_id: str | None = None) -> dict[str, Any]:
+        query = "" if session_id is None else "?" + urllib.parse.urlencode({"sessionId": session_id})
+        return self._request("GET", f"/permissions{query}", timeout=20.0)
+
+    def set_permission(self, session_id: str, preset: str) -> dict[str, Any]:
+        return self._request(
+            "POST",
+            "/permission",
+            body={"sessionId": session_id, "preset": preset},
+            timeout=20.0,
+        )
+
     # -- interactions ---------------------------------------------------
     def interactions(self, session_id: str | None = None) -> dict[str, Any]:
         query = "" if session_id is None else "?" + urllib.parse.urlencode({"sessionId": session_id})

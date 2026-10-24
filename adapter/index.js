@@ -388,6 +388,55 @@ export function apply(ctx, config) {
     };
   }
 
+  function permissionService() {
+    const service = ctx.get("permissionPresets");
+    if (service === undefined) throw new Error("the composed runtime has no permission preset service");
+    return service;
+  }
+
+  function liveSession(sessionId) {
+    const sessions = ctx.get("sessions");
+    const session = sessions?.get(sessionId);
+    if (session === undefined || session === null) {
+      const error = new Error("session is not live in this runtime; send a prompt first");
+      error.status = 409;
+      error.code = "session_not_live";
+      throw error;
+    }
+    return session;
+  }
+
+  function readPermissions(query) {
+    const service = permissionService();
+    const catalog = service.catalog();
+    const sessionId = query.get("sessionId");
+    let current = null;
+    if (sessionId) {
+      try {
+        current = service.current(liveSession(sessionId));
+      } catch (error) {
+        if (error?.code === "session_not_live") current = null;
+        else throw error;
+      }
+    }
+    return {
+      options: catalog.options ?? [],
+      defaultPreset: catalog.defaultPreset ?? null,
+      current,
+    };
+  }
+
+  function applyPermission(body) {
+    const service = permissionService();
+    const sessionId = typeof body?.sessionId === "string" ? body.sessionId : "";
+    const preset = typeof body?.preset === "string" ? body.preset : "";
+    if (sessionId === "") throw new Error("permission change requires a sessionId");
+    if (preset === "") throw new Error("permission change requires a preset");
+    const session = liveSession(sessionId);
+    service.set(session, preset);
+    return { current: service.current(session), preset };
+  }
+
   const server = http.createServer(async (req, res) => {
     try {
       if (req.headers["x-bridge-token"] !== token) {
@@ -414,6 +463,15 @@ export function apply(ctx, config) {
         json(res, 200, await readSession(sessionId));
         return;
       }
+      if (req.method === "GET" && path === "/permissions") {
+        json(res, 200, readPermissions(url.searchParams));
+        return;
+      }
+      if (req.method === "POST" && path === "/permission") {
+        const body = await readBody(req);
+        json(res, 200, applyPermission(body));
+        return;
+      }
       if (req.method === "GET" && path === "/interactions") {
         const sessionId = url.searchParams.get("sessionId");
         json(res, 200, { interactions: queue.list(sessionId === null ? undefined : sessionId) });
@@ -434,7 +492,11 @@ export function apply(ctx, config) {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       log(`request failed: ${message}`);
-      json(res, 500, { error: "adapter_error", message });
+      json(res, Number.isInteger(error?.status) ? error.status : 500, {
+        error: "adapter_error",
+        code: typeof error?.code === "string" ? error.code : "",
+        message,
+      });
     }
   });
 

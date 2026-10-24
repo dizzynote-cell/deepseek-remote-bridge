@@ -101,11 +101,16 @@ GET <base>/api/thread/<sessionId>?turnLimit=6
                  {"type": "agentMessage", "text": "...", "phase": "final"},
                  {"type": "toolCall", "name": "write", "callId": "...", "arguments": "...",
                   "result": "...", "status": "completed", "isError": false},
+                 {"type": "todo", "todos": [{"content": "读取需求", "status": "completed"}]},
                  {"type": "notice", "level": "approval", "text": "请求批准：pwsh — ..."},
                  {"type": "usage", "inputTokens": 0, "outputTokens": 0, "totalTokens": 0}
                ]}],
     "bridgeTotalTurns": 3, "bridgeProvider": "deepseek-account", "bridgeModel": "deepseek-flash",
-    "bridgeUpdatedAt": 0, "bridgeEventCount": 42, "bridgeAttachments": []
+    "bridgeUpdatedAt": 0, "bridgeEventCount": 42, "bridgeAttachments": [],
+    "bridgeTodos": [{"content": "读取需求", "status": "completed"}, {"content": "写文件", "status": "in_progress"}],
+    "bridgeTodosDone": 1, "bridgeTodosTotal": 2,
+    "bridgeActivity": {"running": true, "turn": 2, "turnId": "turn-2", "startedAt": 0, "endedAt": 0,
+                       "tools": 3, "currentTool": "write", "todosDone": 1, "todosTotal": 2}
   }
 }
 ```
@@ -209,6 +214,32 @@ POST <base>/api/interactions/respond
 ```
 
 命中选项标签时按 `selected` 提交，否则作为 `custom` 提交。已被处理或不存在的请求返回 `404 interaction_missing`。
+
+## 权限预设
+
+```http
+GET <base>/api/permissions[?threadId=<sessionId>]
+```
+
+```json
+{"options": [{"value": "workspace-write", "name": "workspace-write", "description": "..."},
+             {"value": "danger-full-access", "name": "danger-full-access", "description": "..."}],
+ "defaultPreset": "workspace-write", "current": "workspace-write", "bridgeDefault": "workspace-write",
+ "threadId": "session-<id>"}
+```
+
+`current` 只在该会话已在本运行时打开时返回，否则为 `null`（目录来自运行时自带的预设表，桥不硬编码）。
+
+```http
+POST <base>/api/permissions
+{"threadId": "session-<id>", "preset": "danger-full-access"}   # 切换本会话
+{"preset": "danger-full-access"}                                # 只改“新会话默认”
+```
+
+切换会先确保会话在本运行时打开（必要时 resume），再调用 Harness 的权限预设服务；结果写入会话日志的
+`permission/preset` 与 `sandbox/mode`。未知预设返回 `400 unknown_preset`；会话被别的进程占用返回 `409 session_busy`。
+
+新会话不需要额外调用：`POST /api/local-tasks` 的 `permissionPreset` 或桥的默认值会在**第一条消息之前**应用。
 
 ## 附件与文件
 

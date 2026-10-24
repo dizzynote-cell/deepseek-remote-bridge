@@ -80,6 +80,45 @@ class TranscriptProjectionTests(unittest.TestCase):
         self.assertEqual(thread["status"], "idle")
         self.assertEqual(thread["name"], "empty")
 
+    def test_todo_plan_is_projected_with_progress(self):
+        self.assertEqual(len(self.thread["bridgeTodos"]), 3)
+        self.assertEqual(self.thread["bridgeTodosDone"], 1)
+        self.assertEqual(self.thread["bridgeTodosTotal"], 3)
+        todos = [item for item in self.items("turn-3") if item["type"] == "todo"]
+        self.assertEqual(len(todos), 1)
+        self.assertEqual(todos[0]["todos"][1]["status"], "in_progress")
+
+    def test_activity_describes_the_open_turn_without_guessing(self):
+        activity = self.thread["bridgeActivity"]
+        self.assertTrue(activity["running"])
+        self.assertEqual(activity["turn"], 3)
+        self.assertEqual(activity["turnId"], "turn-3")
+        self.assertEqual(activity["tools"], 0)
+        self.assertIsNone(activity["currentTool"])
+        self.assertEqual(activity["todosDone"], 1)
+
+    def test_empty_todo_write_is_ignored(self):
+        from app.history_view import project_session
+
+        header, events = load()
+        events = list(events) + [{"type": "todo/write", "seq": 30, "time": 1, "data": {"todos": []}}]
+        thread = project_session(header, events)
+        self.assertEqual(thread["bridgeTodosTotal"], 3)
+
+    def test_only_the_latest_plan_renders_per_turn(self):
+        from app.history_view import project_session
+
+        header, events = load()
+        events = list(events) + [
+            {"type": "todo/write", "seq": 31, "time": 2, "data": {"todos": [{"content": "a", "status": "completed"}]}},
+            {"type": "todo/write", "seq": 32, "time": 3, "data": {"todos": [{"content": "a", "status": "completed"}, {"content": "b", "status": "in_progress"}]}},
+        ]
+        thread = project_session(header, events)
+        cards = [item for turn in thread["turns"] for item in turn["items"] if item["type"] == "todo"]
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(len(cards[0]["todos"]), 2)
+        self.assertEqual(thread["bridgeTodosTotal"], 2)
+
 
 if __name__ == "__main__":
     unittest.main()

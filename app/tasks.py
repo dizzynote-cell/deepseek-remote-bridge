@@ -136,7 +136,13 @@ class TaskRunner:
         threading.Thread(target=self._follow, args=(task, handle), name=f"task-{task.id}", daemon=True).start()
         return task
 
-    def create_session(self, cwd: str, content_blocks: list[dict[str, Any]], session_id: str | None = None) -> LocalTask:
+    def create_session(
+        self,
+        cwd: str,
+        content_blocks: list[dict[str, Any]],
+        session_id: str | None = None,
+        preset: str | None = None,
+    ) -> LocalTask:
         if not cwd:
             raise TaskRejected("缺少工作目录")
         session_id = session_id or f"session-{uuid.uuid4()}"
@@ -151,8 +157,15 @@ class TaskRunner:
         self._register(task)
         try:
             with handle.lock:
+                # Create the session without starting a turn, so the permission
+                # preset is in effect before the first tool call can run.
                 handle.call("session/working-directory/set", {"sessionId": session_id, "path": cwd}, timeout=120.0)
                 handle.opened_sessions.add(session_id)
+            if preset:
+                try:
+                    self.catalog.adapter.set_permission(session_id, preset)
+                except Exception as error:  # noqa: BLE001 - keep the first turn alive
+                    task.detail["permissionError"] = str(error)
             response = handle.call(
                 "session/prompt",
                 {"sessionId": session_id, "contentBlocks": content_blocks},
@@ -166,6 +179,20 @@ class TaskRunner:
             raise TaskRejected(f"创建会话失败：{error}", code="create_failed", status=502) from None
         threading.Thread(target=self._follow, args=(task, handle), name=f"task-{task.id}", daemon=True).start()
         return task
+
+    def ensure_open(self, session_id: str) -> None:
+        """Make a session live in our runtime so its settings can be changed."""
+        handle = self.pool.acquire()
+        try:
+            self._ensure_open(handle, session_id)
+        except RpcError as error:
+            if is_busy_error(error):
+                raise TaskRejected(
+                    "该会话正被另一个 DeepSeek Harness 进程占用，无法修改设置。",
+                    code="session_busy",
+                    status=409,
+                ) from None
+            raise TaskRejected(f"无法打开会话：{error}", code="resume_failed", status=502) from None
 
     def status(self, task_id: str) -> LocalTask | None:
         with self.lock:

@@ -12,7 +12,9 @@ const els = {
   menu: document.querySelector('#menu'), backdrop: document.querySelector('#sidebar-backdrop'),
   providerToggle: document.querySelector('#provider-toggle'), providerMenu: document.querySelector('#provider-menu'),
   settings: document.querySelector('#settings'), settingsDialog: document.querySelector('#settings-dialog'),
-  closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done')
+  closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done'),
+  permissionSelect: document.querySelector('#permission-select'), defaultPermission: document.querySelector('#default-permission'),
+  permissionNote: document.querySelector('#permission-note'), activity: document.querySelector('#activity-strip')
 };
 let threads = [], managedProjects = [], selected = null, threadLoading = false, lastThreadSignature = '';
 let nextCursor = null, threadVisibleCounts = new Map(), threadRequestSerial = 0, threadController = null, currentThread = null;
@@ -25,7 +27,52 @@ const esc = window.bridgeEscape;
 const imageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'ico', 'tiff', 'heic']);
 const statusLabels = { completed: '已完成', failed: '失败', interrupted: '已中断', cancelled: '已取消', in_progress: '进行中', running: '进行中' };
 
+let permissionCatalog = { options: [], defaultPreset: null, bridgeDefault: '' };
+
 function projectName(cwd) { return window.projectDisplay.name(cwd, managedProjects); }
+
+function permissionLabel(value) {
+  const option = permissionCatalog.options.find(item => item.value === value);
+  return option ? (option.name || option.value) : (value || '未知');
+}
+
+function fillPermissionSelect(select, value) {
+  if (!select) return;
+  select.innerHTML = permissionCatalog.options
+    .map(option => `<option value="${esc(option.value)}">${esc(option.name || option.value)}</option>`)
+    .join('');
+  if (value) select.value = value;
+  if (!select.value && select.options.length) select.selectedIndex = 0;
+}
+
+async function loadPermissionCatalog() {
+  try {
+    const data = await (await bridgeFetch('/api/permissions')).json();
+    permissionCatalog = {
+      options: Array.isArray(data.options) ? data.options : [],
+      defaultPreset: data.defaultPreset || null,
+      bridgeDefault: data.bridgeDefault || data.defaultPreset || ''
+    };
+  } catch { /* keep the last catalog */ }
+  fillPermissionSelect(els.permissionSelect, currentThread?.bridgePermission || null);
+  fillPermissionSelect(els.defaultPermission, permissionCatalog.bridgeDefault);
+  if (els.permissionNote) {
+    const active = permissionCatalog.options.find(item => item.value === permissionCatalog.bridgeDefault);
+    els.permissionNote.textContent = active?.description
+      ? `默认预设：${active.name || active.value} — ${active.description}`
+      : '新会话创建时使用这个预设；已有会话在输入框左侧单独切换。';
+  }
+}
+
+async function syncThreadPermission(id) {
+  if (!id) return;
+  try {
+    const data = await (await bridgeFetch(`/api/permissions?threadId=${encodeURIComponent(id)}`)).json();
+    const value = data.current || data.bridgeDefault || permissionCatalog.bridgeDefault;
+    fillPermissionSelect(els.permissionSelect, value);
+    els.permissionSelect.dataset.thread = id;
+  } catch { /* leave the select as-is */ }
+}
 function statusLabel(status) {
   const type = typeof status === 'object' && status ? status.type : status;
   return { active: '当前已加载', notLoaded: '空闲', idle: '空闲', running: '运行中', completed: '已完成', failed: '失败', interrupted: '已中断' }[type] || type || '未知';
@@ -165,6 +212,16 @@ function renderItem(item, turn) {
     if (!content) return '';
     return `<details class="reasoning-card"><summary><span>推理摘要</span><span class="expand-hint">展开查看</span></summary><div class="reasoning-body markdown-body">${window.renderMarkdown(content)}</div><div class="voice-actions">${window.voiceUI?.record(turn, item, content, "reasoning") || ""}</div></details>`;
   }
+  if (item.type === 'todo') {
+    const todos = item.todos || [];
+    const done = todos.filter(entry => entry.status === 'completed').length;
+    if (!todos.length) return '';
+    const rows = todos.map(entry => {
+      const mark = entry.status === 'completed' ? '✓' : entry.status === 'in_progress' ? '◐' : '○';
+      return `<li class="todo-item ${esc(entry.status)}"><span class="todo-mark">${mark}</span><span>${window.renderMarkdown(entry.content)}</span></li>`;
+    }).join('');
+    return `<details class="todo-card" ${done < todos.length ? 'open' : ''}><summary><span>执行计划</span><span class="todo-progress">${done}/${todos.length} 完成</span></summary><ul class="todo-list">${rows}</ul></details>`;
+  }
   if (item.type === 'notice') {
     return `<p class="bridge-notice ${esc(item.level || 'info')}">${esc(item.text || '')}</p>`;
   }
@@ -260,7 +317,10 @@ async function loadThread(id, silent = false, showOlder = false) {
     const summary = threads.find(item => item.id === id);
     els.title.textContent = summary?.name || t.name || '未命名会话';
     const preset = t.bridgeAgentPreset ? ` · 预设 ${t.bridgeAgentPreset}` : '';
-    els.meta.textContent = `项目：${projectName(summary?.cwd || t.cwd)} · ${statusLabel(t.status)} · ${total} 轮${preset} · ID：${t.id || id}`;
+    const plan = Number(t.bridgeTodosTotal) ? ` · 计划 ${Number(t.bridgeTodosDone) || 0}/${Number(t.bridgeTodosTotal)}` : '';
+    els.meta.textContent = `项目：${projectName(summary?.cwd || t.cwd)} · ${statusLabel(t.status)} · ${total} 轮${preset}${plan} · ID：${t.id || id}`;
+    renderActivity(t);
+    syncThreadPermission(id).catch(() => {});
     if (!silent || signature !== lastThreadSignature) {
       const nearBottom = els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 140;
       const remaining = Math.max(0, total - visible);
@@ -282,6 +342,36 @@ async function loadThread(id, silent = false, showOlder = false) {
   }
 }
 
+let activityTimer = null;
+let activityStarted = 0;
+
+function describeActivity(activity) {
+  if (!activity || !activity.running) return '';
+  const parts = [];
+  if (activity.turn) parts.push(`第 ${activity.turn} 轮`);
+  parts.push(activity.currentTool ? `正在运行 ${activity.currentTool}` : '模型正在思考或整理结果');
+  if (activity.tools) parts.push(`已调用工具 ${activity.tools} 次`);
+  if (activity.todosTotal) parts.push(`计划 ${activity.todosDone}/${activity.todosTotal}`);
+  if (activity.startedAt) {
+    const seconds = Math.max(0, Math.round((Date.now() - Number(activity.startedAt)) / 1000));
+    const minutes = Math.floor(seconds / 60);
+    parts.push(`已用时 ${minutes > 0 ? `${minutes} 分 ${seconds % 60} 秒` : `${seconds} 秒`}`);
+  }
+  return parts.join(' · ');
+}
+
+function renderActivity(thread) {
+  const activity = thread?.bridgeActivity;
+  const text = describeActivity(activity);
+  if (!text) {
+    els.activity.hidden = true;
+    els.activity.textContent = '';
+    return;
+  }
+  els.activity.hidden = false;
+  els.activity.innerHTML = `<span class="activity-dot"></span><span>${esc(text)}</span>`;
+}
+
 async function refreshVisibleThread() {
   if (!selected) return;
   await loadThread(selected, true);
@@ -299,6 +389,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') togg
 
 async function boot() {
   await window.voiceUI?.boot();
+  await loadPermissionCatalog();
   await loadThreads(false);
   loadStatus();
   loadBalance(false);
@@ -306,13 +397,76 @@ async function boot() {
   setInterval(loadStatus, 5000);
   setInterval(() => loadBalance(false), 60000);
   setInterval(refreshVisibleThread, 3000);
+  clearInterval(activityTimer);
+  activityTimer = setInterval(() => {
+    if (currentThread && selected) renderActivity(currentThread);
+  }, 1000);
   try {
     const wanted = new URLSearchParams(window.location.search).get('thread');
     if (wanted && threads.some(item => item.id === wanted)) await loadThread(wanted);
   } catch {}
 }
+async function changeSessionPermission(preset) {
+  if (!preset) return;
+  const threadId = els.permissionSelect.dataset.thread || selected;
+  if (!threadId) {
+    showTaskNotice('先选择一个会话，或把它设为新会话默认权限', true);
+    return;
+  }
+  els.permissionSelect.disabled = true;
+  try {
+    const response = await bridgeFetch('/api/permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ threadId, preset })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '切换失败');
+    showTaskNotice(`本会话权限已切换为「${permissionLabel(data.current || preset)}」`);
+    await loadThread(threadId, true);
+  } catch (error) {
+    showTaskNotice(`权限切换失败：${error.message}`, true);
+  } finally {
+    els.permissionSelect.disabled = false;
+  }
+}
+
+async function changeDefaultPermission(preset) {
+  if (!preset) return;
+  try {
+    const response = await bridgeFetch('/api/permissions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ preset })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '保存失败');
+    permissionCatalog.bridgeDefault = data.bridgeDefault || preset;
+    if (els.permissionNote) els.permissionNote.textContent = `新会话将使用「${permissionLabel(preset)}」。`;
+    showTaskNotice(`新会话默认权限：${permissionLabel(preset)}`);
+  } catch (error) {
+    showTaskNotice(`默认权限保存失败：${error.message}`, true);
+  }
+}
+
+function showTaskNotice(message, error = false) {
+  const strip = document.querySelector('#task-strip');
+  if (!strip) return;
+  strip.hidden = !message;
+  strip.textContent = message || '';
+  strip.className = `task-strip${error ? ' error' : ''}`;
+  if (message && !error) {
+    clearTimeout(showTaskNotice.timer);
+    showTaskNotice.timer = setTimeout(() => { strip.hidden = true; }, 4000);
+  }
+}
+
+els.permissionSelect.onchange = () => changeSessionPermission(els.permissionSelect.value);
+if (els.defaultPermission) els.defaultPermission.onchange = () => changeDefaultPermission(els.defaultPermission.value);
+
 els.settings.onclick = () => {
   window.voiceUI?.refreshSettings();
+  loadPermissionCatalog();
   els.settingsDialog.showModal();
 };
 els.closeSettings.onclick = () => els.settingsDialog.close();

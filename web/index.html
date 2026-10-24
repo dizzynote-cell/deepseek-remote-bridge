@@ -37,6 +37,9 @@
         <label class="voice-setting"><input id="voice-toggle" type="checkbox"> 显示语音朗读按钮</label>
         <p id="voice-note" class="settings-note"></p>
         <p class="settings-note">语音只在本机合成：浏览器只拿到缓存键和音频地址，TTS 密钥始终留在桥的配置里。</p>
+        <hr>
+        <label class="voice-setting">新会话默认权限 <select id="default-permission" aria-label="新会话默认权限"></select></label>
+        <p id="permission-note" class="settings-note"></p>
         <footer><button id="settings-done" type="button" class="primary">完成</button></footer>
       </form>
     </dialog>
@@ -52,6 +55,7 @@
         <label id="new-project-row" hidden>项目名称<input id="new-project-name" maxlength="80" placeholder="例如：桥接联调"></label>
         <label>会话名称<input id="new-thread-title" maxlength="100" required></label>
         <label>第一条消息<textarea id="new-thread-text" rows="4" required placeholder="输入这个会话要开始处理的内容"></textarea></label>
+        <label>权限 <select id="new-thread-permission" aria-label="权限预设"></select></label>
         <p id="new-thread-location" class="new-thread-location"></p>
         <footer><button id="cancel-new-thread" type="button">取消</button><button type="submit" class="primary">创建并发送</button></footer>
       </form>
@@ -98,8 +102,10 @@
       <div id="messages" class="messages">
         <div class="empty"><div class="empty-icon">↖</div><h3>选择一个会话开始工作</h3><p>这里显示的是 DeepSeek Harness 的真实会话、工具执行与终态。</p></div>
       </div>
+      <section id="activity-strip" class="activity-strip" role="status" aria-live="polite" hidden></section>
       <section id="task-strip" class="task-strip" hidden></section>
       <form id="composer" class="composer">
+        <label class="permission-pick" title="本会话的工具权限预设">权限<select id="permission-select" aria-label="会话权限预设"></select></label>
         <label class="file-button" title="添加图片或轻量文件">＋<input id="files" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md"></label>
         <textarea id="prompt" rows="1" aria-label="输入发送给 DeepSeek Harness 的内容" placeholder="输入内容，或 Ctrl+V 粘贴截图"></textarea>
         <button id="send" type="submit">发送</button>

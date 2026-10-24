@@ -15,6 +15,10 @@ DEFAULTS: dict[str, Any] = {
     # When the provider is configured, showing the buttons by default is the
     # least surprising behaviour; users can turn it off in the settings dialog.
     "voiceEnabled": True,
+    # Preset applied to sessions created from the page. Empty means "use the
+    # bridge configuration default"; it is validated against the live catalog
+    # before use, never trusted blindly.
+    "permissionPreset": "",
 }
 
 
