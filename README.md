@@ -194,6 +194,8 @@ python tests\live_check.py       --base http://127.0.0.1:8766            # 列�
 python tests\live_interactions.py --base http://127.0.0.1:8766           # 提问与批准闭环
 python tests\live_attachments.py --base http://127.0.0.1:8766            # 图片与文档附件
 python tests\live_ownership.py   --base http://127.0.0.1:8766 --session <自己的测试会话>
+python tests\live_parallel.py    --base http://127.0.0.1:8766           # 两会话并行 + 同会话排队输入
+python tests\live_files.py       --base http://127.0.0.1:8766           # 文件返回与路径白名单
 ```
 
 本机实测结果与未覆盖项见 [`docs/verification.md`](docs/verification.md)。
