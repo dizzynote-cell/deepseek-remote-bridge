@@ -29,13 +29,13 @@ python tests\run_tests.py
 | `test_attachments.py` | 10 | 文档落盘、图片内联、单文件/单批限制、非法 base64、路径逃逸、清理、返回文件白名单 |
 | `test_interactions.py` | 9 | 批准/提问整形、accept→`allowed-once`、拒绝、选项与自定义回答、空回答拒绝、revision、适配器失败 |
 | `test_tasks.py` | 9 | 占用→409 且不重发、发送失败不重试、resume 一次、终态映射、消息 ID 定位 turn、未完成标中断 |
-| `test_server.py` | 14 | 根/前缀挂载、前缀外 404、302、运行中标红、turn 裁剪、跨站写拒绝、目录穿越、CSRF、语音与偏好接口 |
+| `test_server.py` | 15 | 根/前缀挂载、前缀外 404、302、运行中标红、turn 裁剪、跨站写拒绝、目录穿越、CSRF、语音与偏好接口 |
 | `test_voice.py` | 18 | 与页面一致的缓存键、配置解析、未配置/关闭时拒绝、空文本与超长、缓存命中、非法键、缓存目录边界、偏好持久化 |
 | `test_public_distribution.py` | 7 | 私有路径/密钥/会话 ID 扫描、二进制排除、必需文件、`.gitignore`、许可与归属 |
 | `test_markdown.cjs` | 1 | 表格、代码、流式片段、危险链接与原始 HTML 转义 |
 | `test_ui_contract.cjs` | 1 | 资源存在、全部请求走基址、余额替代额度、LOGO 菜单与禁用项、语音按钮与密钥不外泄 |
 
-合计：94 个 Python 用例 + 2 个 Node 用例。
+合计：95 个 Python 用例 + 2 个 Node 用例（含 PWA 与配色检查）。
 
 ## 真实联调
 
@@ -89,7 +89,7 @@ python tests\run_tests.py
 
 1. 不写配置直接启动 → 退出码 2，提示设置 `DSH_EXE` / `DSH_CLI`（错误路径可用）。
 2. 补配置后启动 → `/api/health` `ok:true`，运行时与适配器均可用。
-3. `python tests\run_tests.py` → 当时 70 个 Python 用例 + 2 个 Node 用例全部通过（1.1.0 为 94 + 2）。
+3. `python tests\run_tests.py` → 当时 70 个 Python 用例 + 2 个 Node 用例全部通过（1.3.0 为 95 + 2）。
 4. `python tests\live_check.py --phase create` → 10/10，真实会话与真实工具落盘。
 5. `/api/bridge-info` 的 `capabilities.voice` 与实际实现一致（未配置时为 `false`）。
 
