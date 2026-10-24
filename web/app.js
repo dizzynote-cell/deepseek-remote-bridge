@@ -11,6 +11,8 @@ const els = {
   balance: document.querySelector('#balance'), balanceDetails: document.querySelector('#balance-details'),
   menu: document.querySelector('#menu'), backdrop: document.querySelector('#sidebar-backdrop'),
   providerToggle: document.querySelector('#provider-toggle'), providerMenu: document.querySelector('#provider-menu'),
+  providerSibling: document.querySelector('#provider-sibling'), providerSiblingName: document.querySelector('#provider-sibling-name'),
+  providerSiblingNote: document.querySelector('#provider-sibling-note'),
   settings: document.querySelector('#settings'), settingsDialog: document.querySelector('#settings-dialog'),
   closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done'),
   permissionSelect: document.querySelector('#permission-select'), defaultPermission: document.querySelector('#default-permission'),
@@ -112,6 +114,32 @@ function renderThreads() {
   document.querySelectorAll('.project-heading').forEach(b => b.onclick = () => window.openLocalNewThread?.(b.dataset.projectKind || 'existing', b.dataset.projectCwd));
   document.querySelectorAll('.thread').forEach(b => b.onclick = () => { document.body.classList.remove('sidebar-open'); loadThread(b.dataset.id); });
   els.loadMore.hidden = !nextCursor;
+}
+
+async function loadSwitchTargets() {
+  try {
+    const info = await (await bridgeFetch('/api/bridge-info')).json();
+    const menu = info.logoMenu || {};
+    const targets = Array.isArray(menu.targets) ? menu.targets : [];
+    const sibling = targets.find(target => !target.current);
+    const current = targets.find(target => target.current);
+    if (current?.displayName) {
+      els.providerToggle.setAttribute('aria-label', `切换后端：当前 ${current.displayName}`);
+    }
+    if (!sibling || !els.providerSibling) return;
+    els.providerSiblingName.textContent = sibling.displayName || 'Codex';
+    if (sibling.enabled && sibling.url) {
+      els.providerSibling.disabled = false;
+      els.providerSibling.removeAttribute('aria-disabled');
+      els.providerSibling.classList.add('reachable');
+      els.providerSiblingNote.textContent = `切换到 ${sibling.displayName}`;
+      els.providerSibling.onclick = () => { window.location.href = sibling.url; };
+    } else {
+      els.providerSibling.disabled = true;
+      els.providerSibling.setAttribute('aria-disabled', 'true');
+      els.providerSiblingNote.textContent = '未接入本页 · 由入口页统一切换';
+    }
+  } catch { /* the static menu stays as-is */ }
 }
 
 async function loadThreads(append = false) {
@@ -390,6 +418,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') togg
 async function boot() {
   await window.voiceUI?.boot();
   await loadPermissionCatalog();
+  await loadSwitchTargets();
   await loadThreads(false);
   loadStatus();
   loadBalance(false);

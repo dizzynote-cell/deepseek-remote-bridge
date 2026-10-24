@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import threading
 import time
+import urllib.parse
 from typing import Any
 
 from .attachments import AttachmentStore, ReturnedFiles
@@ -162,27 +163,37 @@ class BridgeState:
                 "permissionPreset": self.config.permission_preset,
             },
             "basePath": self.config.normalized_base_path,
-            "logoMenu": {
-                "enabled": True,
-                "current": self.config.provider_id,
-                "targets": [
-                    {
-                        "providerId": self.config.provider_id,
-                        "displayName": self.config.display_name,
-                        "current": True,
-                        "enabled": True,
-                    },
-                    {
-                        "providerId": "codex",
-                        "displayName": "Codex",
-                        "current": False,
-                        # A second bridge is integrated by the entry page, not here.
-                        "enabled": False,
-                        "reason": "not-configured",
-                        "url": None,
-                    },
-                ],
-            },
+            "logoMenu": self.logo_menu(),
+        }
+
+    def logo_menu(self) -> dict[str, Any]:
+        """Describe the top-left switch entries.
+
+        The sibling entry stays disabled unless its target is configured, so the
+        page never offers a dead jump. A configured entry performs a full page
+        navigation; both bridges keep their own sessions and drafts.
+        """
+        sibling_url = _safe_sibling_url(self.config.sibling_url)
+        return {
+            "enabled": True,
+            "current": self.config.provider_id,
+            "targets": [
+                {
+                    "providerId": self.config.provider_id,
+                    "displayName": self.config.display_name,
+                    "current": True,
+                    "enabled": True,
+                    "url": None,
+                },
+                {
+                    "providerId": self.config.sibling_provider,
+                    "displayName": self.config.sibling_name,
+                    "current": False,
+                    "enabled": sibling_url is not None,
+                    "reason": None if sibling_url is not None else "not-configured",
+                    "url": sibling_url,
+                },
+            ],
         }
 
     def site_config(self) -> dict[str, Any]:
@@ -206,3 +217,14 @@ class BridgeState:
             },
             "permissionPreset": self.config.permission_preset,
         }
+
+
+def _safe_sibling_url(value: str) -> str | None:
+    """Accept only an explicit http(s) target; anything else disables the entry."""
+    text = (value or "").strip()
+    if not text:
+        return None
+    parsed = urllib.parse.urlparse(text)
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return text

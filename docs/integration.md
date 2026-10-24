@@ -9,6 +9,21 @@
 - 另一项：Codex，`disabled` + `aria-disabled="true"`，文案说明由入口页统一切换，**没有** href，不会产生无效跳转。
 - 入口页接管时，把 Codex 项换成真实跳转（或由入口页渲染自己的切换器），并保留当前项的 `aria-current`。
 
+### 让菜单里的 Codex 变成真实跳转
+
+DSH 桥侧只需要一个配置，菜单项就会从"禁用"变成"可点"：
+
+```ini
+DSH_BRIDGE_SIBLING_PROVIDER=codex
+DSH_BRIDGE_SIBLING_NAME=Codex
+DSH_BRIDGE_SIBLING_URL=https://<入口页域名>/
+```
+
+- 校验：只接受 `http(s)://host/...`；空值、相对路径、`javascript:` 都会保持禁用，不会出现死链。
+- 页面的实现：启动时读 `/api/bridge-info`，把 `logoMenu.targets` 里 `current:false` 且
+  `enabled:true` 的那一项接上整页跳转；未配置时保持原来的置灰文案。
+- DSH 不保存"当前后端"到 Codex 的存储里；各桥自己保存最后会话与草稿。
+
 如果由入口页直接注入切换逻辑，唯一需要读的接口是：
 
 ```http

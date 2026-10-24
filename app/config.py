@@ -59,6 +59,9 @@ class BridgeConfig:
     version: str = "0.0.0"
     provider_id: str = "deepseek-harness"
     display_name: str = "DeepSeek Harness"
+    sibling_provider: str = "codex"
+    sibling_name: str = "Codex"
+    sibling_url: str = ""
     # Runtime selection.
     dsh_exe: Path = field(default_factory=lambda: Path(""))
     dsh_cli: Path = field(default_factory=lambda: Path(""))
@@ -289,6 +292,9 @@ def load_config(root: Path | None = None) -> BridgeConfig:
         version=_read_version(root),
         provider_id=_env(env_file, "DSH_BRIDGE_PROVIDER_ID", "deepseek-harness"),
         display_name=_env(env_file, "DSH_BRIDGE_DISPLAY_NAME", "DeepSeek Harness"),
+        sibling_provider=_env(env_file, "DSH_BRIDGE_SIBLING_PROVIDER", "codex"),
+        sibling_name=_env(env_file, "DSH_BRIDGE_SIBLING_NAME", "Codex"),
+        sibling_url=_env(env_file, "DSH_BRIDGE_SIBLING_URL", ""),
         dsh_exe=Path(dsh_exe),
         dsh_cli=Path(dsh_cli),
         dsh_home=dsh_home,

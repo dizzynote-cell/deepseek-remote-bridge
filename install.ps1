@@ -176,8 +176,8 @@ Write-Ok "Wrote $configFile"
 if ((-not $NoStart) -and (AskYes 'Start the bridge now' 'Y')) {
   & (Join-Path $root 'scripts\start-bridge.ps1')
 }
-if ((-not $NoAutostart) -and (AskYes 'Start the bridge automatically after Windows sign-in' 'Y')) {
-  & (Join-Path $root 'scripts\install-autostart.ps1') | Out-Host
+if ((-not $NoAutostart) -and (AskYes 'Create the desktop shortcut and start the bridge at Windows sign-in' 'Y')) {
+  & (Join-Path $root 'scripts\install-shortcuts.ps1') -Desktop -Startup | Out-Host
 }
 
 Write-Host "`nSetup complete." -ForegroundColor Green

@@ -1,5 +1,18 @@
 # 更新日志
 
+## 1.5.0 — 2026-10-25
+
+为合并进 Codex 工作台做准备：桌面/开机快捷方式，以及可配置的左上角切换目标。
+
+- `scripts/install-shortcuts.ps1`：建/删桌面快捷方式与登录启动项，统一指向
+  `scripts/launch-bridge.ps1`（隐藏窗口启动桥 + 托盘，再打开页面；已在运行就只开页面）。
+- 新增 `assets/bridge.ico`（16/32/48/64/256 多尺寸）作为快捷方式图标；安装向导默认两者都建，
+  `install-autostart.ps1` 保留为只建启动项的兼容入口。
+- 左上角菜单的兄弟后端可配置：`DSH_BRIDGE_SIBLING_PROVIDER/NAME/URL`。
+  配置合法 `http(s)` 地址后该项变为可点跳转；空值或非法地址保持禁用（不出死链）。
+  菜单数据仍由 `/api/bridge-info` 的 `logoMenu.targets` 提供，入口页可自行渲染。
+- 新增 `tests/test_logo_menu.py`（5 个用例）覆盖启用/禁用与地址校验；合计 107 个 Python 用例。
+
 ## 1.4.1 — 2026-10-24
 
 让桥不依赖桌面窗口也能拿到与桌面端一致的工具集。

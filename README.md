@@ -79,6 +79,18 @@ python bridge.py                 # 前台运行，Ctrl+C 停止
 
 双击 `DeepSeek Remote Bridge.cmd` 会启动桥 + 托盘并打开页面。
 
+### 桌面快捷方式与开机启动
+
+```powershell
+.\scripts\install-shortcuts.ps1 -Desktop -Startup   # 建桌面快捷方式 + 开机启动
+.\scripts\install-shortcuts.ps1 -Remove             # 两个都删掉
+```
+
+- 桌面快捷方式叫 **DeepSeek Remote Bridge**，图标是蓝色 D（`assets/bridge.ico`）；
+  双击后隐藏窗口启动桥和托盘，再打开页面；已经在运行就只打开页面。
+- 开机启动用的是当前用户的「启动」文件夹快捷方式（登录后运行），与你 Codex 桥的启动项互不影响。
+- 安装向导最后会问一次，默认两个都建。
+
 - 托盘是绿色圆角 **D**，右键可看状态、打开页面/日志、启动/停止/重启，双击打开页面。
 - Windows 10 默认把新图标放进 `^` 溢出区：点 `^` 找到 D 拖到任务栏，或运行
   `.\scripts\show-tray-settings.ps1`。
@@ -134,6 +146,23 @@ python bridge.py                 # 前台运行，Ctrl+C 停止
 
 仍需桌面的三件事：凭据过期后重新登录、桌面 profile 里的自定义 patch（如 MCP 服务器）不会继承、
 桌面正在打开的会话被写锁占用时桥返回 `409`。
+
+## 左上角切换：给入口页的接口
+
+点左上角的 **D** 会打开后端菜单。当前项是 DeepSeek Harness；另一项默认置灰
+（`disabled` + `aria-disabled="true"`），**不会给出无效跳转**。
+
+合并到 Codex 工作台时，只要给 DSH 桥一个"兄弟桥"地址，菜单项就会变成可点的真实跳转：
+
+```ini
+DSH_BRIDGE_SIBLING_PROVIDER=codex
+DSH_BRIDGE_SIBLING_NAME=Codex
+DSH_BRIDGE_SIBLING_URL=https://<入口页域名>/
+```
+
+- 只接受 `http(s)` 绝对地址；空值或 `javascript:` / 相对路径一律保持禁用。
+- 菜单数据来自 `GET /api/bridge-info` 的 `logoMenu.targets`，入口页也可以直接读这个接口自己渲染切换器。
+- 切换是整页跳转，两个桥各自保存会话、草稿与附件待发区，互不迁移（见 [`docs/integration.md`](docs/integration.md)）。
 
 ## 隐私与安全
 
