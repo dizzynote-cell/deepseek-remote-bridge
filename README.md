@@ -51,7 +51,7 @@ Python 桥（本项目）—— 会话目录、历史投影、任务状态、余
 | 返回文件 | ✅ | 从工具结果里识别本机文件，网页预览/下载/本机打开 |
 | 原生账户余额 | ✅ | 充值钱包与赠送钱包分开显示，多币种不相加 |
 | 模型/推理强度切换 | ❌ | 一个运行时固定一条路由；桥不提供假选择器 |
-| 语音播报 | ❌ | 本版未实现，配置项保留但默认关闭 |
+| 语音播报 | ✅（需配置） | 可选：本机 TTS 合成 + 本地缓存，浏览器只拿缓存键与音频地址 |
 | 飞书 / 公网云程序 | ❌ | 本阶段不部署服务器；相关配置项保留且默认关闭 |
 
 ## 快速开始
@@ -114,6 +114,20 @@ python bridge.py --check                # 启动、自检、退出（CI/排障�
 | `DSH_BRIDGE_HOME` | `./state` | 桥自己的令牌、生成的补丁、日志、上传目录 |
 | `DSH_BRIDGE_ATTACHMENT_MAX_BYTES` / `…_BATCH_MAX_BYTES` | 10 MB / 30 MB | 附件单文件与单批上限 |
 | `DSH_BRIDGE_APPROVAL_TIMEOUT_MS` / `…_QUESTION_TIMEOUT_MS` | 15 分钟 | 无人应答时的失败关闭时限 |
+| `DSH_BRIDGE_VOICE` | `0` | 打开网页语音朗读（需要 TTS 凭据） |
+| `VOLC_TTS_ENV_FILE` | 空 | 指向本机 TTS 凭据文件（`VOLC_API_KEY`、`VOLC_VOICE_ID`、`X-Api-Resource-Id`） |
+
+### 语音（可选）
+
+```ini
+DSH_BRIDGE_VOICE=1
+VOLC_TTS_ENV_FILE=D:\keys\voiceapi.env
+```
+
+- 凭据只在桥进程里读取，页面永远拿不到 key；请求体只有文字。
+- 合成结果是 MP3，缓存在 `state/cache/voice/<sha256>.mp3`，同一段文字第二次是缓存命中。
+- 页面上打开「⚙ 设置」可以关掉朗读按钮；关闭后服务端也会拒绝语音请求。
+- `GET /api/voice/config` 会如实报告 `enabled` / `configured`，任一项为假时不会出现朗读按钮。
 
 ## HTTP 接口
 
@@ -150,12 +164,12 @@ GET <base>/api/balance            # 原生余额：available/status/source/updat
 - **能力与身份**：`/api/bridge-info` 返回 `contractVersion: 1`、`providerId: "deepseek-harness"`、`capabilities`（全部来自实现）、`logoMenu.targets`。
 - **状态隔离**：`state/` 下只有桥自己的令牌、补丁、日志、上传；不读也不写 Codex 的数据目录。
 
-详见 [`docs/integration.md`](docs/integration.md)。
+详见 [`docs/integration.md`](docs/integration.md) 与 [`docs/deployment.md`](docs/deployment.md)（部署建议与回退）。
 
 ## 测试
 
 ```powershell
-python tests\run_tests.py        # 离线：70 个 Python 用例 + 2 个 Node 页面契约用例
+python tests\run_tests.py        # 离线：92 个 Python 用例 + 2 个 Node 页面契约用例
 ```
 
 真实联调（需要先启动桥；只创建自己的测试会话与测试目录）：

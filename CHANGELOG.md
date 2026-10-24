@@ -1,5 +1,24 @@
 # 更新日志
 
+## 1.1.0 — 2026-10-24
+
+可选语音朗读，以及在 `docs/` 里补齐给 Codex 的部署与回退说明。
+
+### 语音（新增，可选）
+
+- `app/voice.py`：标准库直连 TTS 的 SSE 接口，合成 MP3 并缓存在桥自己的 `state/cache/voice/`；
+  键为 `SHA-256(JSON.stringify([text, voice, resource, "v3-sse-mp3-rate25"]))`，与页面实现一致。
+- 端点：`/api/voice/config`、`/api/voice/status`、`/api/voice/request`、`/api/voice/audio/<key>`、
+  `/api/preferences`（开关）。
+- 页面：完成轮次的最终回复与推理摘要出现朗读按钮，播放器固定在输入区上方；「⚙ 设置」里可关闭。
+- 凭据只在桥进程里读取，页面只拿缓存键与音频地址；音频接口只接受 64 位十六进制键，不接受路径。
+- 默认关闭（`DSH_BRIDGE_VOICE=0`），未配置或关闭时 `capabilities.voice` 为 `false`，页面不显示按钮。
+- 缓存有上限（2 GB 软上限 + 5 GB 磁盘余量）与 30 天清理；同一段文字第二次是缓存命中。
+
+### 文档
+
+- 新增 `docs/deployment.md`：低侵入的 `/dsh/` 反代写法、Windows 进程托管、上线前检查与回退步骤。
+- `docs/api.md` 补充语音与偏好接口；`docs/verification.md` 补充语音实测。
 ## 1.0.0 — 2026-10-24
 
 首个独立发布版本：把 Codex Remote Bridge 的通用基础设施复用为 **DeepSeek Harness** 远程桥。

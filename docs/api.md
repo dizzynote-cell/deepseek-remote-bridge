@@ -225,10 +225,54 @@ POST <base>/api/open-attachment
 
 在主机上用默认程序打开该文件（仅 Windows）。
 
+## 语音（可选）
+
+```http
+GET <base>/api/voice/config
+```
+
+```json
+{"enabled": true, "configured": true, "voice": "<voice id>", "resource": "<resource id>",
+ "preferences": {"voiceEnabled": true}}
+```
+
+`enabled` 来自 `DSH_BRIDGE_VOICE`，`configured` 表示凭据三项齐全；任一为假时页面不显示朗读按钮。
+
+```http
+POST <base>/api/voice/request
+{"text": "要朗读的文字"}
+```
+
+```json
+{"cached": true, "key": "<64 位十六进制>", "bytes": 10605}
+```
+
+同步合成（`urllib` 直连 SSE，120 秒超时）。失败码：`voice_not_configured`(503)、`voice_text_empty` / `voice_text_too_long`(400)、
+`voice_provider_error` / `voice_provider_unavailable` / `voice_audio_too_large`(502)、`voice_disabled`(403)。
+
+```http
+GET <base>/api/voice/status?keys=<key1>,<key2>
+→ {"cached": {"<key>": true}}
+```
+
+```http
+GET <base>/api/voice/audio/<key>
+→ audio/mpeg，Cache-Control: private, max-age=86400
+```
+
+`key` 必须是 64 位小写十六进制（`SHA-256(JSON.stringify([text, voice, resource, "v3-sse-mp3-rate25"]))`），否则 `404 voice_not_found`；
+音频只从桥自己的缓存目录读取，不接受任何路径参数。
+
+```http
+GET <base>/api/preferences        → {"voiceEnabled": true}
+POST <base>/api/preferences       {"voiceEnabled": false}
+```
+
+只接受已知键与正确类型；其余字段被忽略。关闭后服务端会拒绝新的语音请求。
+
 ## 其他
 
 | 方法 | 路径 | 说明 |
 |---|---|---|
 | GET | `<base>/api/auth/config` | 页面启动配置（本地模式 `authRequired:false`） |
 | GET | `<base>/api/pinned` | 预留：置顶/隐藏列表（当前为空） |
-| GET | `<base>/api/voice/status` | `{"enabled": false}`（本版未实现语音） |

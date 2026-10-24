@@ -29,6 +29,7 @@ from .dsh_adapter import AdapterError
 from .sessions import SessionNotFound
 from .state import BridgeState
 from .tasks import TaskRejected
+from .voice import VoiceError
 
 STATIC_CACHE = "no-store"
 TEXT_CONTENT_TYPES = {".html", ".js", ".css", ".svg", ".json", ".txt", ".webmanifest"}
@@ -216,8 +217,18 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                     return
                 self._json(task.as_dict())
                 return
+            if path == "/api/preferences":
+                self._json(state.preferences.snapshot())
+                return
+            if path == "/api/voice/config":
+                self._json({**state.voice.public(), "preferences": state.preferences.snapshot()})
+                return
             if path == "/api/voice/status":
-                self._json({"enabled": bool(state.config.voice_enabled)})
+                keys = [item for item in (_first(query, "keys") or "").split(",") if item]
+                self._json(state.voice.status(keys[:50]))
+                return
+            if path.startswith("/api/voice/audio/"):
+                self._api_voice_audio(path[len("/api/voice/audio/") :])
                 return
             self._error(404, "未知接口", "unknown_endpoint")
             return
@@ -225,6 +236,12 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         if method == "POST":
             if path == "/api/local-tasks":
                 self._api_submit()
+                return
+            if path == "/api/preferences":
+                self._api_preferences()
+                return
+            if path == "/api/voice/request":
+                self._api_voice_request()
                 return
             if path == "/api/interactions/respond":
                 self._api_respond()
@@ -305,6 +322,57 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         files = self.state.returned_files.collect(texts)
         if files:
             thread["bridgeAttachments"] = files
+
+    # -- preferences and voice ------------------------------------------
+    def _api_preferences(self) -> None:
+        try:
+            payload = self._read_json()
+        except ValueError as error:
+            self._error(400, str(error), "bad_request")
+            return
+        self._json(self.state.preferences.update(payload))
+
+    def _api_voice_request(self) -> None:
+        state = self.state
+        try:
+            payload = self._read_json()
+        except ValueError as error:
+            self._error(400, str(error), "bad_request")
+            return
+        if not state.preferences.snapshot().get("voiceEnabled", True):
+            self._error(403, "网页的语音朗读已关闭", "voice_disabled")
+            return
+        text = str(payload.get("text") or "")
+        try:
+            key, path = state.voice.synthesize(text)
+        except VoiceError as error:
+            status = 400 if error.code.startswith("voice_text") else (503 if error.code == "voice_not_configured" else 502)
+            self._error(status, error.message, error.code)
+            return
+        self._json({"cached": True, "key": key, "bytes": path.stat().st_size})
+
+    def _api_voice_audio(self, key: str) -> None:
+        state = self.state
+        clean = key.strip("/")
+        try:
+            path = state.voice.path_for(clean)
+        except VoiceError:
+            self._error(404, "语音不存在", "voice_not_found")
+            return
+        if not path.is_file():
+            self._error(404, "语音不存在", "voice_not_found")
+            return
+        try:
+            data = path.read_bytes()
+        except OSError as error:
+            self._error(500, f"读取语音失败：{error}", "voice_read_failed")
+            return
+        self._send(
+            200,
+            data,
+            "audio/mpeg",
+            {"cache-control": "private, max-age=86400", "accept-ranges": "none"},
+        )
 
     def _api_attachment(self, query: dict[str, list[str]]) -> None:
         raw = _first(query, "path")

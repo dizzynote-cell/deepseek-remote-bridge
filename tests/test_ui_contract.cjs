@@ -27,7 +27,7 @@ assert.match(html, /DeepSeek Bridge/);
 assert.match(html, /DeepSeek Harness/);
 
 // 3. Every fetch in page scripts goes through the base-path helper.
-const scripts = ['app.js', 'local-composer.js', 'interactions.js'].map(name => ({
+const scripts = ['app.js', 'local-composer.js', 'interactions.js', 'voice-ui.js'].map(name => ({
   name,
   source: fs.readFileSync(path.join(web, name), 'utf8')
 }));
@@ -53,9 +53,19 @@ assert.match(html, /id="provider-menu"[^>]*role="menu"/);
 assert.match(html, /role="menuitem"[^>]*disabled[^>]*aria-disabled="true"/);
 assert.match(html, /Codex/);
 
-// 6. No remote script injection: the page loads only local scripts.
+// 6. Optional voice: assets exist, the toggle is wired, no provider key ships.
+assert.ok(fs.existsSync(path.join(web, 'voice-ui.js')), 'voice-ui.js missing');
+assert.ok(fs.existsSync(path.join(web, 'voice.css')), 'voice.css missing');
+assert.match(html, /id="voice-toggle"/);
+assert.match(html, /id="settings-dialog"/);
+for (const file of ['voice-ui.js', 'app.js']) {
+  const source = fs.readFileSync(path.join(web, file), 'utf8');
+  assert.doesNotMatch(source, /VOLC_API_KEY|X-Api-Key/, `${file} must not carry provider credentials`);
+}
+
+// 7. No remote script injection: the page loads only local scripts.
 for (const asset of assets) {
   assert.ok(!/^https?:/i.test(asset), `remote asset ${asset} is not allowed`);
 }
 
-console.log('UI contract passed: assets, base path, balance, and provider menu');
+console.log('UI contract passed: assets, base path, balance, provider menu, voice');

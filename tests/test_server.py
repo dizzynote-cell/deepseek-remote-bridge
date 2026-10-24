@@ -69,6 +69,58 @@ class FakeBalance:
         return {"available": True, "entries": [], "display": {"label": "余额 ¥1.00", "primary": None}}
 
 
+class FakeVoice:
+    def __init__(self, cache_dir):
+        self.cache_dir = cache_dir
+        self.enabled = True
+        self.settings = type("Settings", (), {"ready": True, "voice": "v", "resource": "r"})()
+
+    @property
+    def available(self):
+        return True
+
+    def public(self):
+        return {"enabled": True, "configured": True, "voice": "v", "resource": "r"}
+
+    def status(self, keys):
+        return {"cached": {key: self.cached(key) for key in keys}}
+
+    def cached(self, key):
+        try:
+            return self.path_for(key).is_file()
+        except Exception:
+            return False
+
+    def path_for(self, key):
+        from app.voice import VoiceError, is_digest
+
+        if not is_digest(key):
+            raise VoiceError("invalid_voice_key")
+        return self.cache_dir / f"{key}.mp3"
+
+    def synthesize(self, text):
+        from app.voice import VoiceError
+
+        if not str(text or "").strip():
+            raise VoiceError("voice_text_empty", "没有可朗读的文字")
+        key = "a" * 64
+        path = self.cache_dir / f"{key}.mp3"
+        path.write_bytes(b"ID3-fake")
+        return key, path
+
+
+class FakePreferences:
+    def __init__(self):
+        self.values = {"voiceEnabled": True}
+
+    def snapshot(self):
+        return dict(self.values)
+
+    def update(self, patch):
+        self.values.update(patch)
+        return dict(self.values)
+
+
 class FakeState:
     def __init__(self, config, web_dir):
         self.config = config
@@ -84,6 +136,9 @@ class FakeState:
             },
         )()
         self.interactions = type("Interactions", (), {"snapshot": lambda self: {"requests": []}, "respond": lambda self, payload: {"status": "answered"}})()
+        self.preferences = FakePreferences()
+        self.voice = FakeVoice(Path(config.home) / "voice-cache")
+        self.voice.cache_dir.mkdir(parents=True, exist_ok=True)
 
     def health(self):
         return {"ok": True}
@@ -200,6 +255,52 @@ class HttpSurfaceTests(unittest.TestCase):
     def test_unknown_api_is_404(self):
         _, port = self.build()
         self.assertEqual(get(f"http://127.0.0.1:{port}/api/nope")[0], 404)
+
+    def test_voice_config_and_preferences(self):
+        _, port = self.build()
+        status, body, _ = get(f"http://127.0.0.1:{port}/api/voice/config")
+        self.assertEqual(status, 200)
+        self.assertTrue(json.loads(body)["configured"])
+        status, body, _ = get(f"http://127.0.0.1:{port}/api/preferences")
+        self.assertEqual(json.loads(body), {"voiceEnabled": True})
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/preferences",
+            method="POST",
+            payload={"voiceEnabled": False},
+        )
+        self.assertEqual(status, 200)
+        self.assertFalse(json.loads(body)["voiceEnabled"])
+
+    def test_voice_request_then_audio_is_served(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/voice/request",
+            method="POST",
+            payload={"text": "讲一句话"},
+        )
+        self.assertEqual(status, 200)
+        key = json.loads(body)["key"]
+        self.assertRegex(key, r"^[0-9a-f]{64}$")
+        status, audio, headers = get(f"http://127.0.0.1:{port}/api/voice/audio/{key}")
+        self.assertEqual(status, 200)
+        content_type = {key.lower(): value for key, value in headers.items()}.get("content-type")
+        self.assertEqual(content_type, "audio/mpeg")
+        self.assertEqual(audio, b"ID3-fake")
+
+    def test_voice_request_rejects_empty_text(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/voice/request",
+            method="POST",
+            payload={"text": "   "},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["code"], "voice_text_empty")
+
+    def test_unknown_voice_key_is_404(self):
+        _, port = self.build()
+        self.assertEqual(get(f"http://127.0.0.1:{port}/api/voice/audio/not-a-key")[0], 404)
+        self.assertEqual(get(f"http://127.0.0.1:{port}/api/voice/audio/{'b' * 64}")[0], 404)
 
 
 class HelperTests(unittest.TestCase):

@@ -19,9 +19,19 @@
   <link rel="stylesheet" href="markdown.css?v=1">
   <link rel="stylesheet" href="interactions.css?v=1">
   <link rel="stylesheet" href="provider-menu.css?v=1">
+  <link rel="stylesheet" href="voice.css?v=1">
 </head>
 <body>
   <main class="shell">
+    <dialog id="settings-dialog" class="settings-dialog">
+      <form method="dialog">
+        <header><strong>设置</strong><button id="close-settings" type="button">×</button></header>
+        <label class="voice-setting"><input id="voice-toggle" type="checkbox"> 显示语音朗读按钮</label>
+        <p id="voice-note" class="settings-note"></p>
+        <p class="settings-note">语音只在本机合成：浏览器只拿到缓存键和音频地址，TTS 密钥始终留在桥的配置里。</p>
+        <footer><button id="settings-done" type="button" class="primary">完成</button></footer>
+      </form>
+    </dialog>
     <dialog id="new-thread-dialog" class="new-thread-dialog">
       <form id="new-thread-form" method="dialog">
         <header><strong>新建会话</strong><button id="close-new-thread" type="button">×</button></header>
@@ -72,6 +82,7 @@
             </button>
             <div id="balance-details" class="balance-details" hidden></div>
           </div>
+          <button id="settings" class="icon-button" type="button" aria-label="打开设置" title="设置">⚙</button>
           <div id="mode" class="mode detecting">正在检测运行时</div>
           <div class="readonly">可输入</div>
         </div>
@@ -91,6 +102,7 @@
   <script src="lib/markdown-it-15.0.3.min.js"></script>
   <script src="markdown.js?v=1"></script>
   <script src="project-display.js?v=1"></script>
+  <script src="voice-ui.js?v=1"></script>
   <script src="app.js?v=1"></script>
   <script src="local-composer.js?v=1"></script>
   <script src="interactions.js?v=1"></script>

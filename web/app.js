@@ -10,7 +10,9 @@ const els = {
   refresh: document.querySelector('#refresh'), mode: document.querySelector('#mode'), loadMore: document.querySelector('#load-more'),
   balance: document.querySelector('#balance'), balanceDetails: document.querySelector('#balance-details'),
   menu: document.querySelector('#menu'), backdrop: document.querySelector('#sidebar-backdrop'),
-  providerToggle: document.querySelector('#provider-toggle'), providerMenu: document.querySelector('#provider-menu')
+  providerToggle: document.querySelector('#provider-toggle'), providerMenu: document.querySelector('#provider-menu'),
+  settings: document.querySelector('#settings'), settingsDialog: document.querySelector('#settings-dialog'),
+  closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done')
 };
 let threads = [], managedProjects = [], selected = null, threadLoading = false, lastThreadSignature = '';
 let nextCursor = null, threadVisibleCounts = new Map(), threadRequestSerial = 0, threadController = null, currentThread = null;
@@ -161,7 +163,7 @@ function renderItem(item, turn) {
   if (item.type === 'reasoning') {
     const content = reasoningText(item).trim();
     if (!content) return '';
-    return `<details class="reasoning-card"><summary><span>推理摘要</span><span class="expand-hint">展开查看</span></summary><div class="reasoning-body markdown-body">${window.renderMarkdown(content)}</div></details>`;
+    return `<details class="reasoning-card"><summary><span>推理摘要</span><span class="expand-hint">展开查看</span></summary><div class="reasoning-body markdown-body">${window.renderMarkdown(content)}</div><div class="voice-actions">${window.voiceUI?.record(turn, item, content, "reasoning") || ""}</div></details>`;
   }
   if (item.type === 'notice') {
     return `<p class="bridge-notice ${esc(item.level || 'info')}">${esc(item.text || '')}</p>`;
@@ -210,6 +212,7 @@ function bindAttachmentButtons() {
 }
 
 function renderTurns(turns) {
+  window.voiceUI?.clear(selected);
   if (!turns.length) return '<div class="empty"><h3>暂无历史</h3><p>在下方输入第一条消息，或在左侧新建会话。</p></div>';
   return turns.map(turn => {
     const items = turn.items || [];
@@ -223,7 +226,7 @@ function renderTurns(turns) {
     return `<article class="turn turn-${esc(turn.status || 'unknown')}">
       <div class="user"><div class="label">你</div><div class="bubble">${esc(itemText(user) || '（非文字输入）')}${user?.bridgeImageCount ? `<span class="user-images">＋${user.bridgeImageCount} 张图片</span>` : ''}</div></div>
       ${middle}
-      <div class="assistant"><div class="label">DeepSeek Harness · ${esc(modelLabel)}${turnStatus}</div><div class="bubble"><div class="markdown-body">${window.renderMarkdown(answer || (turn.status === 'in_progress' ? '正在处理…' : '（尚无最终回答）'))}</div></div></div>
+      <div class="assistant"><div class="label">DeepSeek Harness · ${esc(modelLabel)}${turnStatus}</div><div class="bubble"><div class="markdown-body">${window.renderMarkdown(answer || (turn.status === 'in_progress' ? '正在处理…' : '（尚无最终回答）'))}</div><div class="voice-actions">${final ? window.voiceUI?.record(turn, final, answer, 'final') || '' : ''}</div></div></div>
       ${renderAttachments(turn)}
     </article>`;
   }).join('');
@@ -267,6 +270,7 @@ async function loadThread(id, silent = false, showOlder = false) {
       if (olderButton) olderButton.onclick = () => { threadVisibleCounts.set(id, Math.min(total, Number(limit) + 6)); loadThread(id, false, true); };
       if (allButton) allButton.onclick = () => { threadVisibleCounts.set(id, 'all'); loadThread(id, false, true); };
       bindAttachmentButtons();
+      window.voiceUI?.bind(id);
       if (showOlder) els.messages.scrollTop = 0;
       else if (!silent || nearBottom) els.messages.scrollTop = els.messages.scrollHeight;
       lastThreadSignature = signature;
@@ -294,6 +298,7 @@ document.addEventListener('click', () => toggleProviderMenu(false));
 document.addEventListener('keydown', event => { if (event.key === 'Escape') toggleProviderMenu(false); });
 
 async function boot() {
+  await window.voiceUI?.boot();
   await loadThreads(false);
   loadStatus();
   loadBalance(false);
@@ -306,6 +311,12 @@ async function boot() {
     if (wanted && threads.some(item => item.id === wanted)) await loadThread(wanted);
   } catch {}
 }
+els.settings.onclick = () => {
+  window.voiceUI?.refreshSettings();
+  els.settingsDialog.showModal();
+};
+els.closeSettings.onclick = () => els.settingsDialog.close();
+els.settingsDone.onclick = () => els.settingsDialog.close();
 els.menu.onclick = () => document.body.classList.add('sidebar-open');
 els.backdrop.onclick = () => document.body.classList.remove('sidebar-open');
 els.search.oninput = renderThreads;

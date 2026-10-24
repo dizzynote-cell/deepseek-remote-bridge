@@ -15,8 +15,10 @@ from .config import BridgeConfig
 from .dsh_adapter import AdapterClient, AdapterError
 from .dsh_runtime import RuntimePool, stage_diagnostics
 from .interactions import InteractionBridge
+from .preferences import Preferences
 from .sessions import SessionCatalog
 from .tasks import TaskRunner
+from .voice import VoiceService, load_settings
 
 
 class BridgeState:
@@ -43,6 +45,16 @@ class BridgeState:
         )
         self.tasks = TaskRunner(config, self.pool, self.catalog, self.returned_files, self._on_task_finished)
         self.interactions = InteractionBridge(self.adapter, self.catalog)
+        self.preferences = Preferences(config.data_dir / "preferences.json")
+        self.voice = VoiceService(
+            config.cache_dir / "voice",
+            load_settings(config.voice_env_file),
+            enabled=bool(config.voice_enabled),
+        )
+        try:
+            self.voice.sweep()
+        except OSError:
+            pass
         self.started_at = time.time()
         self.boot_error = ""
         self._runtime_lock = threading.Lock()
@@ -130,7 +142,7 @@ class BridgeState:
             "attachments": True,
             "approvals": True,
             "userQuestions": True,
-            "voice": bool(self.config.voice_enabled),
+            "voice": bool(self.voice.available and self.preferences.snapshot().get("voiceEnabled", True)),
             "billing": "balance",
             "modelSelection": False,
         }
@@ -185,6 +197,11 @@ class BridgeState:
             "authRequired": False,
             "ownerConfigured": True,
             "authenticated": True,
-            "voice": bool(self.config.voice_enabled),
+            "voice": {
+                "enabled": bool(self.voice.enabled),
+                "configured": bool(self.voice.settings.ready),
+                "available": bool(self.voice.available),
+                "shown": bool(self.voice.available and self.preferences.snapshot().get("voiceEnabled", True)),
+            },
             "permissionPreset": self.config.permission_preset,
         }
