@@ -53,13 +53,23 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
   if (url.pathname.includes('/api/')) return;
   if (request.mode === 'navigate') return;
+  // Stale-while-revalidate: the cached copy answers immediately, and the fresh
+  // response updates the cache for the next load. Without this, an installed app
+  // would keep old CSS/JS until the cache name changed by hand.
   event.respondWith(
-    caches.match(request).then(hit => hit || fetch(request).then(response => {
-      if (response.ok && response.type === 'basic') {
-        const copy = response.clone();
-        caches.open(CACHE).then(cache => cache.put(request, copy)).catch(() => {});
+    caches.match(request).then(hit => {
+      const refresh = fetch(request).then(response => {
+        if (response.ok && response.type === 'basic') {
+          const copy = response.clone();
+          caches.open(CACHE).then(cache => cache.put(request, copy)).catch(() => {});
+        }
+        return response;
+      });
+      if (hit) {
+        refresh.catch(() => {});
+        return hit;
       }
-      return response;
-    }))
+      return refresh;
+    })
   );
 });

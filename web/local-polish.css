@@ -66,3 +66,9 @@ body.mobile-ui .permission-pick select{max-width:30vw}
 .todo-item.in_progress .todo-mark{color:var(--accent)}
 .todo-item.in_progress{color:#dbe3ff}
 .todo-item p{margin:0}
+/* Phone composer: textarea on its own row, controls under it. */
+body.mobile-ui .composer{flex-wrap:wrap;gap:8px}
+body.mobile-ui .composer textarea{order:1;flex:1 1 100%;min-height:44px}
+body.mobile-ui .permission-pick{order:2;flex:1 1 auto;max-width:none;height:40px}
+body.mobile-ui .file-button{order:2}
+body.mobile-ui .composer #send{order:2}

@@ -1,263 +1,172 @@
 # DeepSeek Remote Bridge
 
-把 **DeepSeek Harness** 的真实会话、工具执行和本机账户余额接到网页上：手机、平板、另一台电脑只负责输入和查看，代码、终端、文件操作仍在你自己的主力电脑上执行。
+> 手机、平板或另一台电脑打开网页，就能用你主力电脑上的 **DeepSeek Harness** 干活：
+> 真实会话、真实工具、真实批准，右上角是**原生账户余额**。
 
-这是 [Codex Remote Bridge](https://github.com/dizzynote-cell/codex-remote-bridge)（MIT）的**独立适配项目**：复用它的网页外观、Markdown 渲染、附件策略和桥接思路，执行层则按 DeepSeek Harness 自己的官方 SDK 协议重新实现。**不是 DeepSeek 官方产品**，也不修改、不打包 DeepSeek Harness 安装目录。
+**v1.4.1** · 作者 [xiyannan](https://github.com/dizzynote-cell) · MIT · 未部署、无服务器依赖、仓库内不含任何密钥
 
-- 版本：见 [`VERSION`](VERSION)
-- 许可：MIT，保留原作者与上游项目归属（见 [`LICENSE`](LICENSE)、[`NOTICE.md`](NOTICE.md)）
+![会话示例：计划与进度](docs/images/conversation.png)
+
+<p align="center"><img src="docs/images/mobile.png" width="320" alt="手机界面" /></p>
 
 ---
 
-## 它到底连接了什么
+## 它解决什么问题
 
-```text
-浏览器 / 手机 / 平板
-        │  HTTP（可配置基址：/ 或 /dsh/）
-        ▼
-Python 桥（本项目）—— 会话目录、历史投影、任务状态、余额缓存、附件、交互转发
-        │  stdio 双向 JSON-RPC（官方 SDK wire protocol，一行一帧）
-        ▼
-独立 DSH SDK 运行时进程（dsh --profile sdk --patch <桥生成的补丁>）
-        │
-        ├─ 真实会话存储（与桌面端同一个 DSH_HOME，可读取既有会话、续写）
-        ├─ 真实工具栈（fs / pwsh / 搜索 / 子代理 / 技能 / 沙箱与批准策略）
-        └─ 桥自带的宿主适配器插件（loopback HTTP）
-              ├─ 原生账户余额（ctx.deepseekAccount.getBalance）
-              ├─ 会话列表与完整历史（ctx.sessionQuery）
-              └─ 工具批准 / 用户提问（approval/request、user-questions/request）
-```
+DeepSeek Harness 很强，但它只在你自己的电脑上。离开电脑时：
 
-三条边界：
+- 想让它在项目里改个文件、跑个命令 —— 没入口；
+- 它卡在"需要批准"上 —— 你看不到；
+- 想知道它做到哪一步了 —— 只能回去看屏幕。
 
-1. **执行层是官方 SDK 协议。** 桥不伪造回合、不拼历史 JSON、不做 UI 自动化。会话所有权由 Harness 自己的跨进程写锁保证：会话正被另一个进程持有（例如桌面端已打开）时，桥返回 `409 session_busy`，**不会**并发改写。
-2. **余额是原生账户。** 金额来自 Harness 已登录的 Platform 账户（`/api/v0/users/get_user_summary` 的 `normal_wallets` / `bonus_wallets`），保留十进制字符串与币种，失败就报失败，不显示 0。
-3. **宿主适配器只在 127.0.0.1 上监听。** 每次启动随机端口 + 令牌，令牌只落在桥自己的 `state/` 目录；浏览器永远拿不到 Harness 凭据。
+这个桥把**同一个运行时**暴露成一个网页：代码、终端、文件操作仍然在主力电脑上执行，
+手机只负责输入和查看。**不是云服务，不需要公网服务器，也不会上传你的会话。**
 
-## 能力（来自实际实现，不是示例）
+## 核心亮点
 
-| 能力 | 状态 | 说明 |
-|---|---|---|
-| 读取既有会话 | ✅ | `ctx.sessionQuery` 读真实日志，不改写 |
-| 续写既有会话 | ✅ | `session/resume`，被占用时明确报错 |
-| 新建会话（真实项目目录） | ✅ | `session/working-directory/set` + `session/prompt` |
-| 工具执行 | ✅ | pwsh / bash / read / write / edit / glob / grep / web / skill / subagent |
-| 终态判定 | ✅ | `session/wait` + `turn/end.reason`，不把回执当完成 |
-| 同会话追加输入 | ✅ | Harness 自身排队（`queuedInput`）；**无** `turn/steer` |
-| 取消运行中任务 | ❌ | SDK wire 没有取消方法，桥如实报告 `cancel: false` |
-| 工具批准 | ✅ | 桥作为 `approval/request` answerer，网页批准/拒绝 |
-| 用户提问 | ✅ | 挂载官方 `dsh-tool-ask-user`，网页回答回填工具调用 |
-| 附件（图片/文档） | ✅ | 图片内联为 image block；文档落到桥的 uploads 目录并给出绝对路径 |
-| 返回文件 | ✅ | 从工具结果里识别本机文件，网页预览/下载/本机打开 |
-| 原生账户余额 | ✅ | 充值钱包与赠送钱包分开显示，多币种不相加 |
-| 手机网页 / PWA | ✅ | 响应式 + 应用到主屏幕；Service Worker 只缓存静态资源，不缓存 `/api` 与页面 |
-| 工具集 | ✅ 28/32 | 与桌面端一致的工具；`schedule_*` 需要桌面的会话控制器，SDK 组合里没有 |
-| 会话内权限切换 | ✅ | 输入框左侧切换 `workspace-write` / `danger-full-access`，写入会话日志；新会话可用默认值 |
-| 执行计划与进度 | ✅ | 渲染 `todo_write` 的清单与完成度（含表头与实时条） |
-| 实时状态条 | ✅ | 当前轮次、正在运行的工具、工具次数、计划进度、已用时 |
-| 模型/推理强度切换 | ❌ | 一个运行时固定一条路由；桥不提供假选择器 |
-| 语音播报 | ✅（需配置） | 可选：本机 TTS 合成 + 本地缓存，浏览器只拿缓存键与音频地址 |
-| 飞书 / 公网云程序 | ❌ | 本阶段不部署服务器；相关配置项保留且默认关闭 |
+- **真会话，不是聊天 API 演示**：通过官方 SDK 协议（`session/prompt`、`session/resume`、
+  `session/wait`、`session.event`）驱动本机运行时，历史、工具执行、终态都来自 Harness 自己。
+- **手机优先**：响应式布局、可"添加到主屏幕"（PWA）、通知区域托盘图标、深色界面。
+- **工具齐全**：模型可见 28 个工具（桌面端 32 个），含 `pwsh`、文件读写、搜索、网页、技能、
+  子代理、工作流、计划（todo）、`present`、`load_workspace_dependencies`。
+- **批准与提问能回到手机**：工具要授权、模型要提问时，网页里出现待处理卡片，点一下就把决定送回原请求。
+- **执行计划与实时进度**：模型用 `todo_write` 拆步骤时，网页显示 3/3 完成、当前在跑哪个工具、用了多久。
+- **权限可控**：输入框左侧有「权限」选择器（`workspace-write` / `danger-full-access`），
+  可以给单个会话切换，也可以在设置里定"新会话默认权限"。
+- **原生余额**：右上角是 DeepSeek 账户的真实钱包（充值/赠送分开、多币种不加总），失败就显示"暂不可用"，不会显示 0。
+- **可选语音**：完成的回复可以点一下朗读，TTS 只在主机上合成，密钥不进浏览器。
 
-## 快速开始
+## 安装前准备
 
-### 依赖
+1. Windows 10/11（本机在 Windows 10 22H2 验证）
+2. Python 3.10+（只需标准库，无第三方依赖）
+3. 已安装并登录 **DeepSeek Harness 桌面版**（本机验证 `0.2.1-rc.2`）
+4. 知道它的安装位置，例如 `C:\Program Files\DSH\DeepSeek Harness.exe`
+5. 端口 8766 空闲（Codex 桥用的是 8765/8780，不会冲突）
 
-- Windows（宿主适配器与运行时的验证环境；桥本身是标准 Python，其他平台未验证）
-- Python 3.10+（本机验证：3.13.14；无第三方 Python 依赖）
-- 已安装并能正常登录的 DeepSeek Harness 桌面版（本机验证：`0.2.1-rc.2`，SDK `serverInfo` `0.0.1`）
-- 浏览器（无构建步骤、无 Node 依赖）
-
-### 配置
+## 安装（约 2 分钟）
 
 ```powershell
-Copy-Item config\.env.example config\.env
-# 编辑 config/.env，至少设置：
-#   DSH_EXE=<安装目录>\DeepSeek Harness.exe
-#   DSH_CLI=<安装目录>\resources\app.asar\dsh\node_modules\@deepseek-ai\dsh-desktop-host\lib\cli.js
+git clone https://github.com/dizzynote-cell/deepseek-remote-bridge.git
+cd deepseek-remote-bridge
+powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-不填 `DSH_EXE` 时脚本会探测几个常见安装位置；找不到会打印明确的配置错误，而不是启动一个空桥。
+向导会做六件事：检查 Python → 自动找到（或询问）Harness 安装路径 → 选端口 →
+建工作目录 → 选默认权限（可选配语音）→ 写 `config/.env`、启动桥、可选开机自启。
 
-### 启动
+不想交互也可以：
 
 ```powershell
-python bridge.py
-# 打开 http://127.0.0.1:8766/
+.\install.ps1 -Unattended -Port 8766 `
+  -ProjectsRoot "$env:USERPROFILE\DSH-Bridge\projects" `
+  -Preset workspace-write -NoAutostart
 ```
 
-常用参数（也可写进 `config/.env`）：
+重新配置用 `-Force`（会保留一份 `config/.env.bak`）。
+
+## 启动与运行
 
 ```powershell
-python bridge.py --port 8767            # 换端口
-python bridge.py --base-path /dsh/      # 挂在反向代理前缀下
-python bridge.py --check                # 启动、自检、退出（CI/排障用）
-```
-
-`--check` 会真的拉起一次 Harness 运行时并访问适配器，退出码 0 表示运行时与适配器都可用。
-
-手机上可以「添加到主屏幕」当独立应用用（`web/manifest.webmanifest` + 图标 + Service Worker 只缓存静态资源，不缓存任何 `/api` 与页面导航）。安装要求安全上下文：`https://` 或 `localhost`；用局域网 IP 的 http 打开时退化为普通网页。
-
-
-也可以用 `DeepSeek Remote Bridge.cmd` 或 `scripts\` 下的脚本托管：
-
-```powershell
-.\scripts\start-bridge.ps1      # 后台启动并等待健康检查
-.\scripts\status-bridge.ps1     # PID、地址、健康、运行时路由
-.\scripts\stop-bridge.ps1       # 只停 state/bridge.pid 记录的那个 bridge.py
+python bridge.py                 # 前台运行，Ctrl+C 停止
+.\scripts\start-bridge.ps1       # 后台启动并等健康检查
+.\scripts\status-bridge.ps1      # PID / 地址 / 健康 / 托盘状态
+.\scripts\stop-bridge.ps1        # 只停 state/bridge.pid 里那个进程
 .\scripts\restart-bridge.ps1
-.\scripts\watchdog.ps1          # 健康检查失败时自动重启
-.\scripts\install-autostart.ps1 # 开机启动（可 -Remove）
-powershell -STA -File .\scripts\tray.ps1   # 托盘菜单
+.\scripts\watchdog.ps1           # 健康检查失败时自动重启
+.\scripts\install-autostart.ps1  # 开机自启（-Remove 取消）
 ```
 
-桥进程在端口绑定成功后自己写 `state/bridge.pid`，退出时只删除自己的记录；脚本按「Python + 命令行里的绝对 `bridge.py` 路径」识别进程，手动用相对路径启动的桥不会被脚本管理，**也不会误杀同机的 Codex 桥**。
+双击 `DeepSeek Remote Bridge.cmd` 会启动桥 + 托盘并打开页面。
 
-托盘（通知区域）说明：
+- 托盘是绿色圆角 **D**，右键可看状态、打开页面/日志、启动/停止/重启，双击打开页面。
+- Windows 10 默认把新图标放进 `^` 溢出区：点 `^` 找到 D 拖到任务栏，或运行
+  `.\scripts\show-tray-settings.ps1`。
+- 启动脚本只按 `state/bridge.pid` 管理自己的进程，**不会碰同机的 Codex 桥**。
 
-- `start-bridge.ps1`、`DeepSeek Remote Bridge.cmd` 会自动带起托盘；`scripts\start-tray.ps1` 可以单独启动。
-- 图标是绿色圆角 **D**，右键菜单：状态 / 打开页面 / 打开日志目录 / 任务栏显示设置 / 启动 / 停止 / 重启 / 退出托盘；双击打开页面。
-- Windows 10 默认把**新**的通知区域图标放进 `^` 溢出区：点 `^` 找到绿色 D，拖到任务栏即可固定；或运行 `scripts\show-tray-settings.ps1` 打开任务栏设置。
-- 全屏游戏/视频会连任务栏一起遮住，退出全屏再看。
-- 托盘只按 `state/bridge.pid` 里记录的进程操作，不会碰 Codex 桥或其他 Python。
+## 手机访问
 
-### 第一次验证
+| 场景 | 做法 |
+|---|---|
+| 同一台电脑 | `http://127.0.0.1:8766/` |
+| 同一局域网 | 反代到本机端口，并加上访问控制（默认只监听回环） |
+| 外网 | 用你自己的 HTTPS 隧道/反代到 `127.0.0.1:8766`，不要直接把端口暴露到公网 |
+| 安装到桌面 | HTTPS（或 localhost）下用浏览器"添加到主屏幕"，获得全屏独立窗口 |
 
-1. 左侧能看到真实会话列表（按工作目录分组）。
-2. 右上角显示「余额 ¥…」与「原生账户 / 更新于 …」，点开有钱包明细。
-3. 选一个**测试会话**（或点「新建」），发送一句要求写文件的话，观察工具卡片、终态与历史续写。
+基址可配：`DSH_BRIDGE_BASE_PATH=/dsh/` 时所有资源、接口、下载都会跟着前缀走；
+前缀之外的路径一律 404，不会串到同源的 Codex 桥。
+
+> 登录/鉴权还没有实现。局域网或外网使用前请先加一层反代认证；
+> 飞书 OAuth 登录的施工图在 [`docs/feishu-setup.md`](docs/feishu-setup.md)。
+
+## 配置
+
+全部写在 `config/.env`（进程环境变量优先）：
+
+| 变量 | 默认 | 说明 |
+|---|---|---|
+| `DSH_EXE` / `DSH_CLI` | 自动探测 | Harness 可执行文件与 CLI 入口 |
+| `DSH_HOME` | 空（用 Harness 默认） | 隔离测试时才需要 |
+| `DSH_BRIDGE_HOST` / `DSH_BRIDGE_PORT` | `127.0.0.1` / `8766` | 监听地址与端口 |
+| `DSH_BRIDGE_BASE_PATH` | `/` | 可挂 `/dsh/` |
+| `DSH_BRIDGE_PROVIDER` / `DSH_BRIDGE_MODEL` | `deepseek-account` / `deepseek-flash` | 模型路由 |
+| `DSH_BRIDGE_REASONING_EFFORT` | 空 | 如 `high` / `max`（桌面端默认 `max`） |
+| `DSH_BRIDGE_PERMISSION_PRESET` | `workspace-write` | 新会话默认权限 |
+| `DSH_BRIDGE_PROJECTS_ROOT` / `…_STANDALONE_DIR` | `~/DSH-Bridge/...` | 允许新建会话的目录白名单 |
+| `DSH_BRIDGE_HOME` | `./state` | 令牌、补丁、日志、上传、缓存 |
+| `DSH_BRIDGE_VOICE` / `VOLC_TTS_ENV_FILE` | `0` / 空 | 可选语音朗读 |
+| `DSH_BRIDGE_ATTACHMENT_MAX_BYTES` / `…_BATCH_…` | 10 MB / 30 MB | 附件限制 |
+
+## 用起来是什么样
+
+- **发任务**：选会话直接输入；附件（图片/文档）随消息上传，图片内联给模型，文档落到桥目录并把路径写进提示。
+- **看进度**：底部实时条显示「第 2 轮 · 正在运行 write · 已调用工具 2 次 · 计划 4/5 · 已用时 4 秒」。
+- **接批准**：工具要授权时，"待处理"面板出现卡片；允许/拒绝/回答问题都按原请求回填。
+- **取结果**：模型写出的文件出现在"返回的文件"，可预览、下载或在主机上打开。
+- **换权限**：输入框左侧切换本会话权限；设置里定新会话默认值。
+- **听结果**：完成的回复可朗读（需配置 TTS）。
 
 ## 不开桌面客户端能用吗
 
-**能。** 桥不是桌面客户端的遥控器：它用安装包里的同一个运行时自己启动一个
-`dsh --profile sdk` 进程（`bridge.py → cmd → DeepSeek Harness.exe --expose-internals .../cli.js`），
-模型账户、凭据、会话存储都来自同一个 `$DSH_HOME`。桌面窗口关掉、甚至从未启动，桥都照常工作。
+能。桥用安装包里的同一个运行时自己启动 `dsh --profile sdk` 进程，凭据与会话都来自同一个
+`%USERPROFILE%\.dsh`；桌面窗口关掉也照常工作。实测工具覆盖 28/32，差的 4 个是
+`schedule_*`（会话内定时提醒，需要桌面的会话控制器，SDK 组合里没有）。
 
-工具对照（实测同一次 `request/header` 的模型可见工具列表）：
+仍需桌面的三件事：凭据过期后重新登录、桌面 profile 里的自定义 patch（如 MCP 服务器）不会继承、
+桌面正在打开的会话被写锁占用时桥返回 `409`。
 
-| 组合 | 工具数 | 说明 |
-|---|---|---|
-| 桌面（web/desktop profile） | 32 | 含 `present`、`schedule_*`、`load_workspace_dependencies` |
-| 桥（sdk profile + 桥的补丁） | **28** | 已补 `ask_user_question`、`present`、`load_workspace_dependencies` |
-| 差集 | 4 | `schedule_create/delete/list/update`：需要 `dsh-schedule` + 桌面会话控制器，SDK 组合不含 |
+## 隐私与安全
 
-`load_workspace_dependencies` 需要 `DSH_PRIMARY_RUNTIME`；桥会自动探测
-`<安装目录>\resources\runtime\primary-runtime`，不需要手工配置。
-
-仍然需要桌面客户端的事情（如实）：
-
-- **凭据过期后重新登录**：登录流程属于桌面端；桥只使用已保存的授权，不会替你登录。
-- **桌面 profile 的自定义 patch**（例如自己加的 MCP 服务器、客户端 UI 设置）不会继承到 sdk 组合；
-  这类能力要接进桥，需要写进桥自己的 `--patch`。
-- **桌面端正在打开的会话**被它持有写锁，桥会返回 `409 session_busy`，不会抢。
-
-`docs/api.md` 里的 `capabilities` 只描述桥真实具备的能力；桌面端有而桥没有的，不会写成 true。
-
-## 配置项
-
-全部可选，写在 `config/.env`（优先级：进程环境变量 > `config/.env` > 内置默认值）。
-
-| 变量 | 默认 | 含义 |
-|---|---|---|
-| `DSH_BRIDGE_HOST` / `DSH_BRIDGE_PORT` | `127.0.0.1` / `8766` | 监听地址与端口（不复用 Codex 的 8765/8780） |
-| `DSH_BRIDGE_BASE_PATH` | `/` | 页面基址，支持 `/dsh/` |
-| `DSH_EXE` / `DSH_CLI` | 探测 | Harness 可执行文件与 CLI 入口 |
-| `DSH_HOME` | 空（用 Harness 默认） | 隔离测试时指向独立数据目录 |
-| `DSH_BRIDGE_PROVIDER` / `DSH_BRIDGE_MODEL` | `deepseek-account` / `deepseek-flash` | SDK `initialize` 的模型路由 |
-| `DSH_BRIDGE_REASONING_EFFORT` | 空 | 可选推理强度 id（`high`、`max` 等） |
-| `DSH_BRIDGE_PERMISSION_PRESET` | `workspace-write` | 新会话权限预设，可选 `danger-full-access` |
-| `DSH_BRIDGE_PROJECTS_ROOT` / `DSH_BRIDGE_STANDALONE_DIR` | `~/DSH-Bridge/projects`、`~/DSH-Bridge/sessions` | 允许新建会话的目录白名单 |
-| `DSH_BRIDGE_HOME` | `./state` | 桥自己的令牌、生成的补丁、日志、上传目录 |
-| `DSH_BRIDGE_ATTACHMENT_MAX_BYTES` / `…_BATCH_MAX_BYTES` | 10 MB / 30 MB | 附件单文件与单批上限 |
-| `DSH_BRIDGE_APPROVAL_TIMEOUT_MS` / `…_QUESTION_TIMEOUT_MS` | 15 分钟 | 无人应答时的失败关闭时限 |
-| `DSH_BRIDGE_VOICE` | `0` | 打开网页语音朗读（需要 TTS 凭据） |
-| `VOLC_TTS_ENV_FILE` | 空 | 指向本机 TTS 凭据文件（`VOLC_API_KEY`、`VOLC_VOICE_ID`、`X-Api-Resource-Id`） |
-
-### 语音（可选）
-
-```ini
-DSH_BRIDGE_VOICE=1
-VOLC_TTS_ENV_FILE=D:\keys\voiceapi.env
-```
-
-- 凭据只在桥进程里读取，页面永远拿不到 key；请求体只有文字。
-- 合成结果是 MP3，缓存在 `state/cache/voice/<sha256>.mp3`，同一段文字第二次是缓存命中。
-- 页面上打开「⚙ 设置」可以关掉朗读按钮；关闭后服务端也会拒绝语音请求。
-- `GET /api/voice/config` 会如实报告 `enabled` / `configured`，任一项为假时不会出现朗读按钮。
-
-## HTTP 接口
-
-所有接口都在配置的基址下（默认 `/`，挂载时 `/dsh/`）。项目自带契约见 [`docs/api.md`](docs/api.md)，与双桥整合相关的两个接口摘要：
-
-```http
-GET <base>/api/bridge-info        # 契约版本、providerId、真实能力、LOGO 菜单目标
-GET <base>/api/balance            # 原生余额：available/status/source/updatedAt/stale/entries[]
-```
-
-`/api/balance` 示例（**示意数据**，不是任何真实账户）：
-
-```json
-{
-  "providerId": "deepseek-harness",
-  "available": true,
-  "status": "ok",
-  "source": "harness-account",
-  "updatedAt": 0,
-  "stale": false,
-  "entries": [
-    {"currency": "CNY", "wallet": "normal", "amount": "0.0000000000000000"},
-    {"currency": "CNY", "wallet": "bonus",  "amount": "0"}
-  ]
-}
-```
-
-## 双桥整合预留（给 Codex 的接口）
-
-按双桥整合约定 v1 预留，尚未接入第二个后端：
-
-- **左上角 LOGO 是切换入口**：`#provider-toggle` 打开 `role="menu"` 的菜单，当前项可读名称为「DeepSeek Harness」；Codex 项渲染为 `disabled` + `aria-disabled="true"`，不提供无效跳转。
-- **基址可配置**：页面内所有静态资源用相对路径，所有请求经 `web/bridge-client.js` 的 `bridgeFetch` 加前缀；服务端在非 `/` 基址下，前缀之外的路径一律 404，因此不会串到 Codex 的路由。
-- **能力与身份**：`/api/bridge-info` 返回 `contractVersion: 1`、`providerId: "deepseek-harness"`、`capabilities`（全部来自实现）、`logoMenu.targets`。
-- **状态隔离**：`state/` 下只有桥自己的令牌、补丁、日志、上传；不读也不写 Codex 的数据目录。
-
-详见 [`docs/integration.md`](docs/integration.md) 与 [`docs/deployment.md`](docs/deployment.md)（部署建议与回退）。
-
-## 测试
-
-```powershell
-python tests\run_tests.py        # 离线：102 个 Python 用例 + 2 个 Node 页面契约用例
-```
-
-真实联调（需要先启动桥；只创建自己的测试会话与测试目录）：
-
-```powershell
-python tests\live_check.py       --base http://127.0.0.1:8766            # 列表→历史→新建→工具→终态→重启后续写
-python tests\live_interactions.py --base http://127.0.0.1:8766           # 提问与批准闭环
-python tests\live_attachments.py --base http://127.0.0.1:8766            # 图片与文档附件
-python tests\live_ownership.py   --base http://127.0.0.1:8766 --session <自己的测试会话>
-python tests\live_parallel.py    --base http://127.0.0.1:8766           # 两会话并行 + 同会话排队输入
-python tests\live_files.py       --base http://127.0.0.1:8766           # 文件返回与路径白名单
-```
-
-本机实测结果与未覆盖项见 [`docs/verification.md`](docs/verification.md)。
+- 仓库里**没有**任何密钥、令牌、会话记录或本机绝对路径；`config/.env`、`state/`、`*.pem`、日志与上传目录都在 `.gitignore` 内。
+- 桥只监听回环；写请求有同源检查；下载只允许工作区白名单内的文件。
+- 适配器插件只在 `127.0.0.1` 的随机端口监听，每次启动随机令牌；浏览器永远拿不到 Harness 凭据。
+- 不做遥测，不上传任何内容。
 
 ## 已知限制
 
-- **没有取消与逐会话关闭**：官方 SDK wire 不提供，桥不会假装有。
-- **一个运行时一条模型路由**：换模型需要换运行时，本版不提供模型选择器。
-- **同一会话只能被一个进程写**：桌面端已打开的会话会返回 `409`；这是 Harness 的锁，不是桥的缺陷。
-- **stdout 噪声**：官方 DeepSeek 账户模型适配器会往 stdout 打一行模型列表诊断（与 SDK 文档「stdout 只放协议帧」冲突），桥按行跳过非 JSON 帧并计数，不影响协议。
-- **沙箱依赖宿主环境**：在验证机上 `workspace-write` 预设下 pwsh 子进程以 `3221225794`（DLL 初始化失败）退出；这是宿主沙箱问题，桥如实显示工具结果。可用 `danger-full-access` 预设规避（该预设按 Harness 定义同时关闭批准）。
-- **附件只走两条真实通道**：图片内联给模型；其他文件落到桥目录并给出绝对路径让模型读，不做模型侧的“附件解析”。
-- **云端与飞书未实现**：本阶段没有部署服务器；飞书登录与接入的施工图见 [`docs/feishu-setup.md`](docs/feishu-setup.md)，阻塞点见 [`docs/feishu.md`](docs/feishu.md)。
-- **还没做的功能**：与官方 SDK 的逐项对照、以及手机场景的缺口与优先级，见 [`docs/roadmap.md`](docs/roadmap.md)。
+- **没有取消运行中的任务、没有指定回合 steer、没有模型热切换**：官方 SDK 协议不提供，面板如实显示 `false`。
+- **定时提醒（`schedule_*`）**不可用，原因见上。
+- **只验证了 Windows**；语音只实测了火山 TTS。
+- **凭据过期**需要回桌面端点一次登录。
+- 没有任何登录体系，公网暴露前必须自己加一层认证。
 
-## 隐私
+## 开发与测试
 
-- 不在仓库里放任何真实会话 ID、余额、日志、绝对私有路径、密钥或授权材料。
-- `config/.env`、`state/`、`*.pem`、`*.key`、日志与上传目录都在 `.gitignore` 内；发布前另有 `tests/test_public_distribution.py` 扫描实际文件内容。
-- 桥只读 Harness 的会话存储来展示历史；写入一律通过 Harness 自己的接口。
+```powershell
+python tests\run_tests.py        # 102 个 Python 用例 + 2 个 Node 页面契约用例
+```
+
+真实联调（只创建自己的测试会话/目录）：`live_check.py`、`live_interactions.py`、
+`live_attachments.py`、`live_ownership.py`、`live_parallel.py`、`live_files.py`、
+`live_permissions.py`、`live_tools.py`。结果见 [`docs/verification.md`](docs/verification.md)。
+
+文档：架构 [`docs/architecture.md`](docs/architecture.md) · 接口 [`docs/api.md`](docs/api.md) ·
+双桥整合 [`docs/integration.md`](docs/integration.md) · 部署与回退 [`docs/deployment.md`](docs/deployment.md) ·
+缺口与路线 [`docs/roadmap.md`](docs/roadmap.md) · 飞书登录引导 [`docs/feishu-setup.md`](docs/feishu-setup.md)
 
 ## 许可与归属
 
-MIT。上游 [Codex Remote Bridge](https://github.com/dizzynote-cell/codex-remote-bridge)（作者 xiyannan）的网页结构、Markdown 渲染、附件策略与桥接思路被复用并保留署名；DeepSeek Harness 及其运行时、SDK、账户服务均属 DeepSeek，本项目只按官方接口调用，不分发其安装包或用户数据。
+MIT。复用并署名了 [Codex Remote Bridge](https://github.com/dizzynote-cell/codex-remote-bridge)
+（作者 xiyannan）的网页结构、Markdown 渲染、附件策略与桥接思路；执行层按 DeepSeek Harness
+官方 SDK 协议独立实现。DeepSeek Harness 及其运行时、SDK、账户服务均属 DeepSeek，
+本项目按官方接口调用，不分发其安装包或用户数据。详见 [`LICENSE`](LICENSE)、[`NOTICE.md`](NOTICE.md)。
