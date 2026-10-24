@@ -45,6 +45,27 @@
 
 `load_workspace_dependencies` 依赖 `DSH_PRIMARY_RUNTIME`，桥已自动探测；`present` 通过补丁挂载官方插件。
 
+#### 这 4 个 `schedule_*` 影响面
+
+它们不是"执行任务"的工具，而是**会话内的定时提醒**（官方描述）：
+
+> `schedule_create`: Create a reminder in the current session that delivers prompt when it becomes due.
+> 支持 `after_seconds` / `at` / `every_seconds` / `daily` / `weekly` / `cron`。
+
+| 场景 | 是否需要 |
+|---|---|
+| 写代码、改文件、跑命令、查资料、做文档、审阅 | 不需要 |
+| "20 分钟后检查部署"、"每天 9 点提醒我"、"每周五汇总" | 需要 |
+
+两个补充事实：
+
+1. 到期投递需要**宿主进程在跑**：以后只用桥、不开桌面，桌面端建的提醒本身也不会响。
+2. 桥侧目前没有任何定时能力（既没有这 4 个工具，也没有定时 UI）。
+
+如果以后需要，可行做法是桥自己实现（网页上设提醒 → 到期把 prompt 提交回该会话），
+或先用 Windows 计划任务调用 `POST /api/local-tasks`；两者都不需要官方的 schedule 栈。
+
+
 ## 2. 手机控制才暴露的产品缺口
 
 | 缺口 | 影响 | 性质 |
