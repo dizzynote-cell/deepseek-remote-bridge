@@ -184,7 +184,7 @@ GET <base>/api/balance            # 原生余额：available/status/source/updat
 ## 测试
 
 ```powershell
-python tests\run_tests.py        # 离线：92 个 Python 用例 + 2 个 Node 页面契约用例
+python tests\run_tests.py        # 离线：94 个 Python 用例 + 2 个 Node 页面契约用例
 ```
 
 真实联调（需要先启动桥；只创建自己的测试会话与测试目录）：

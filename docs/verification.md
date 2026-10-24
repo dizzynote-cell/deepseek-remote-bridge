@@ -25,7 +25,7 @@ python tests\run_tests.py
 |---|---|---|
 | `test_history_view.py` | 9 | 用户/助手/推理/工具/通知投影、Harness 上下文不冒充用户、turn 终态、usage 聚合、有效工作目录、消息 ID |
 | `test_balance.py` | 7 | 十进制字符串保留、多币种不相加、失败不归零、过期快照、缓存、非法金额丢弃 |
-| `test_config_and_patch.py` | 9 | 基址归一化、环境变量优先级、配置缺项、归档内 CLI、令牌持久化、补丁内容与注入防护 |
+| `test_config_and_patch.py` | 11 | 基址归一化、环境变量优先级、配置缺项、归档内 CLI、令牌持久化、补丁内容与注入防护 |
 | `test_attachments.py` | 10 | 文档落盘、图片内联、单文件/单批限制、非法 base64、路径逃逸、清理、返回文件白名单 |
 | `test_interactions.py` | 9 | 批准/提问整形、accept→`allowed-once`、拒绝、选项与自定义回答、空回答拒绝、revision、适配器失败 |
 | `test_tasks.py` | 9 | 占用→409 且不重发、发送失败不重试、resume 一次、终态映射、消息 ID 定位 turn、未完成标中断 |
@@ -34,6 +34,8 @@ python tests\run_tests.py
 | `test_public_distribution.py` | 7 | 私有路径/密钥/会话 ID 扫描、二进制排除、必需文件、`.gitignore`、许可与归属 |
 | `test_markdown.cjs` | 1 | 表格、代码、流式片段、危险链接与原始 HTML 转义 |
 | `test_ui_contract.cjs` | 1 | 资源存在、全部请求走基址、余额替代额度、LOGO 菜单与禁用项、语音按钮与密钥不外泄 |
+
+合计：94 个 Python 用例 + 2 个 Node 用例。
 
 ## 真实联调
 
@@ -85,7 +87,7 @@ python tests\run_tests.py
 
 1. 不写配置直接启动 → 退出码 2，提示设置 `DSH_EXE` / `DSH_CLI`（错误路径可用）。
 2. 补配置后启动 → `/api/health` `ok:true`，运行时与适配器均可用。
-3. `python tests\run_tests.py` → 当时 70 个 Python 用例 + 2 个 Node 用例全部通过（1.1.0 为 92 + 2）。
+3. `python tests\run_tests.py` → 当时 70 个 Python 用例 + 2 个 Node 用例全部通过（1.1.0 为 94 + 2）。
 4. `python tests\live_check.py --phase create` → 10/10，真实会话与真实工具落盘。
 5. `/api/bridge-info` 的 `capabilities.voice` 与实际实现一致（未配置时为 `false`）。
 
