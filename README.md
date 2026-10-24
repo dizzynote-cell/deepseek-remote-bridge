@@ -91,6 +91,21 @@ python bridge.py --check                # 启动、自检、退出（CI/排障�
 
 `--check` 会真的拉起一次 Harness 运行时并访问适配器，退出码 0 表示运行时与适配器都可用。
 
+
+也可以用 `DeepSeek Remote Bridge.cmd` 或 `scripts\` 下的脚本托管：
+
+```powershell
+.\scripts\start-bridge.ps1      # 后台启动并等待健康检查
+.\scripts\status-bridge.ps1     # PID、地址、健康、运行时路由
+.\scripts\stop-bridge.ps1       # 只停 state/bridge.pid 记录的那个 bridge.py
+.\scripts\restart-bridge.ps1
+.\scripts\watchdog.ps1          # 健康检查失败时自动重启
+.\scripts\install-autostart.ps1 # 开机启动（可 -Remove）
+powershell -STA -File .\scripts\tray.ps1   # 托盘菜单
+```
+
+桥进程在端口绑定成功后自己写 `state/bridge.pid`，退出时只删除自己的记录；脚本按「Python + 命令行里的绝对 `bridge.py` 路径」识别进程，手动用相对路径启动的桥不会被脚本管理，**也不会误杀同机的 Codex 桥**。
+
 ### 第一次验证
 
 1. 左侧能看到真实会话列表（按工作目录分组）。

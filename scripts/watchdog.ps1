@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+﻿# SPDX-License-Identifier: MIT
 # Copyright (c) 2026 xiyannan — Project: DeepSeek Remote Bridge
 # Keep the bridge alive: restart only when its own health check fails.
 param([int]$IntervalSeconds = 30)

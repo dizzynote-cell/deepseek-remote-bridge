@@ -125,6 +125,27 @@ class PatchTests(unittest.TestCase):
         with self.assertRaises(RenderError):
             render_patch(self.payload(preset="workspace-write\n- id: evil"))
 
+class PidFileTests(unittest.TestCase):
+    def test_pid_file_is_written_and_cleared(self):
+        import os
+
+        from app.main import _clear_pid, _write_pid
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bridge.pid"
+            _write_pid(path)
+            self.assertEqual(path.read_text(encoding="ascii").strip(), str(os.getpid()))
+            _clear_pid(path)
+            self.assertFalse(path.exists())
+
+    def test_clear_leaves_a_foreign_pid_file(self):
+        from app.main import _clear_pid
+
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "bridge.pid"
+            path.write_text("1", encoding="ascii")
+            _clear_pid(path)
+            self.assertTrue(path.exists())
 
 if __name__ == "__main__":
     unittest.main()

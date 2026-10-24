@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+﻿# SPDX-License-Identifier: MIT
 # Copyright (c) 2026 xiyannan — Project: DeepSeek Remote Bridge
 # Shared helpers for the launcher scripts. Dot-source from the other scripts.
 # These helpers only ever touch the bridge's own PID file and its own
@@ -54,10 +54,17 @@ function Test-BridgeProcess {
   if (-not $ProcessId) { return $null }
   $process = Get-CimInstance Win32_Process -Filter "ProcessId = $ProcessId" -ErrorAction SilentlyContinue
   if (-not $process) { return $null }
+  # Only Python processes are candidates; never match anything else that happens
+  # to have a similar command line.
+  $executable = [string]$process.ExecutablePath
+  if ([string]::IsNullOrWhiteSpace($executable) -or $executable -notmatch '(?i)python') { return $null }
   $command = [string]$process.CommandLine
-  $expected = Join-Path $Root 'bridge.py'
-  if ($command -like "*$expected*") { return $process }
-  if ($command -like '*bridge.py*' -and $command -like "*$(Split-Path $Root -Leaf)*") { return $process }
+  $expected = (Join-Path $Root 'bridge.py') -replace '\\', '/'
+  $normalized = $command -replace '\\', '/'
+  # The launcher always passes the absolute script path, so identity is exact.
+  # A manual start with a relative path simply stays unmanaged rather than
+  # risking a stop of a different bridge.
+  if ($normalized -like "*$expected*") { return $process }
   return $null
 }
 
@@ -119,14 +126,23 @@ function Start-Bridge {
   $errLog = Join-Path $logDir 'bridge.err.log'
   $python = (Get-Command python -ErrorAction SilentlyContinue)
   if (-not $python) { throw '找不到 python。请先安装 Python 3.10+ 并加入 PATH。' }
-  $arguments = @('bridge.py')
-  $process = Start-Process -FilePath $python.Source -ArgumentList $arguments -WorkingDirectory $Root -WindowStyle Hidden `
-    -RedirectStandardOutput $outLog -RedirectStandardError $errLog -PassThru
-  Set-Content -Path (Get-BridgePidFile $Root) -Value $process.Id -Encoding ascii
+  # Detach completely: a redirected Start-Process keeps the launcher's handles
+  # open and the script never returns. The bridge writes its own pid file.
+  $commandLine = 'cmd.exe /c ""{0}" -u "{1}" >> "{2}" 2>&1"' -f $python.Source, (Join-Path $Root 'bridge.py'), $outLog
+  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine = $commandLine
+    CurrentDirectory = $Root
+  }
+  if (-not $created -or -not $created.ProcessId) { throw '无法启动桥进程。' }
   if (Wait-BridgeHealth -Root $Root -Seconds 90) {
-    Write-Host "桥已启动（PID $($process.Id)）：$(Get-BridgeUrl $Root)"
+    $running = Get-RunningBridge $Root
+    if ($running) {
+      Write-Host "桥已启动（PID $($running.ProcessId)）：$(Get-BridgeUrl $Root)"
+    } else {
+      Write-Host "桥已响应健康检查：$(Get-BridgeUrl $Root)"
+    }
   } else {
-    Write-Host "桥进程已启动（PID $($process.Id)），但健康检查未通过。查看日志：$errLog"
+    Write-Host "桥进程已启动，但健康检查未通过。查看日志：$errLog"
   }
 }
 

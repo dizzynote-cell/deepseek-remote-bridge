@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+﻿# SPDX-License-Identifier: MIT
 # Copyright (c) 2026 xiyannan — Project: DeepSeek Remote Bridge
 # Add (or remove) a Startup shortcut for this bridge only.
 param([switch]$Remove)

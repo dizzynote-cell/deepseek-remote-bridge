@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+﻿# SPDX-License-Identifier: MIT
 # Copyright (c) 2026 xiyannan — Project: DeepSeek Remote Bridge
 # Report the bridge process, URL and health without changing anything.
 . (Join-Path $PSScriptRoot 'bridge-common.ps1')

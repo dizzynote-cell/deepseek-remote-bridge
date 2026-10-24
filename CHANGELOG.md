@@ -15,6 +15,14 @@
 - 默认关闭（`DSH_BRIDGE_VOICE=0`），未配置或关闭时 `capabilities.voice` 为 `false`，页面不显示按钮。
 - 缓存有上限（2 GB 软上限 + 5 GB 磁盘余量）与 30 天清理；同一段文字第二次是缓存命中。
 
+### 进程托管
+
+- 桥进程在端口绑定成功后自己写 `state/bridge.pid`，退出时只删除自己的记录。
+- 启动改用 `Win32_Process.Create` 完全脱离父进程，`start-bridge.ps1` 不再挂住不返回。
+- 进程身份要求「Python 可执行文件 + 命令行里的绝对 `bridge.py` 路径」，不会误杀同机 Codex 桥或其他 Python。
+- 新增 `scripts/tray.ps1`（托盘：状态/打开/启动/停止/重启/退出），只操作自己的 PID。
+- `.ps1` 全部改为 UTF-8 BOM，Windows PowerShell 5.1 下中文提示不再乱码。
+
 ### 文档
 
 - 新增 `docs/deployment.md`：低侵入的 `/dsh/` 反代写法、Windows 进程托管、上线前检查与回退步骤。

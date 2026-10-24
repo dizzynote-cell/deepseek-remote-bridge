@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import signal
 import sys
 import threading
@@ -65,6 +66,8 @@ def main(argv: list[str] | None = None) -> int:
 
     threading.Thread(target=warm, name="warm-runtime", daemon=True).start()
     server = serve(config, state)
+    pid_file = config.home / "bridge.pid"
+    _write_pid(pid_file)
 
     if args.check:
         time.sleep(3.0)
@@ -72,6 +75,7 @@ def main(argv: list[str] | None = None) -> int:
         print("  health:", health["ok"], "adapter:", health["adapter"]["ok"], flush=True)
         server.shutdown()
         state.shutdown()
+        _clear_pid(pid_file)
         return 0 if health["adapter"]["ok"] else 1
 
     stop = threading.Event()
@@ -93,7 +97,26 @@ def main(argv: list[str] | None = None) -> int:
     print("stopping…", flush=True)
     server.shutdown()
     state.shutdown()
+    _clear_pid(pid_file)
     return 0
+
+
+def _write_pid(path) -> None:
+    """Record this process so the launcher scripts and tray can find it."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(str(os.getpid()), encoding="ascii")
+    except OSError as error:
+        print(f"  warning: cannot write {path}: {error}", flush=True)
+
+
+def _clear_pid(path) -> None:
+    """Remove the pid file only when it still describes this process."""
+    try:
+        if path.read_text(encoding="ascii").strip() == str(os.getpid()):
+            path.unlink()
+    except (OSError, ValueError):
+        pass
 
 
 def _with(config, **changes):

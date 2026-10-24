@@ -43,15 +43,20 @@ handle /dsh/* {
 .\scripts\start-bridge.ps1      # 后台启动并等待 /api/health
 .\scripts\status-bridge.ps1     # PID、地址、健康、运行时路由
 .\scripts\stop-bridge.ps1       # 只停 state/bridge.pid 里记录的那个 bridge.py
+.\scripts\restart-bridge.ps1    # 先停再起
 .\scripts\watchdog.ps1          # 健康检查失败时重启（只重启自己的进程）
 .\scripts\install-autostart.ps1 # 开机启动快捷方式（可 -Remove）
+powershell -STA -File .\scripts\tray.ps1   # 托盘：状态/打开/启动/停止/重启/退出
 ```
 
 要点：
 
-- 进程身份按 `bridge.py` + 仓库路径匹配，**不会**按进程名杀 Python，也不会碰 Codex 的进程。
-- 日志在 `state/logs/bridge.out.log` / `bridge.err.log`；运行时的 stderr 在 `state/logs/runtime-*.log`。
-- 启动前 `scripts/start-bridge.ps1` 会检查端口占用并拒绝启动，不会终止占用端口的未知进程。
+- 桥进程自己把 PID 写进 `state/bridge.pid`（在端口绑定成功之后），退出时只删除自己的记录。
+- 脚本按「Python 可执行文件 + 命令行里的绝对 `bridge.py` 路径」识别进程，因此不会误杀同机的 Codex 桥或其他 Python；
+  手动用相对路径启动的桥不会被脚本管理（宁可不管理，也不错杀）。
+- 启动用 `Win32_Process.Create` 完全脱离父进程，日志重定向到 `state/logs/bridge.out.log`；
+  用 `Start-Process -RedirectStandardOutput` 会让启动脚本挂着不返回，已避开。
+- 所有 `.ps1` 带 UTF-8 BOM，Windows PowerShell 5.1 才能正确读中文提示。
 
 ## 4. 上线前检查
 
