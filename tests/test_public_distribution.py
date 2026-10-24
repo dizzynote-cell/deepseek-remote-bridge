@@ -55,7 +55,7 @@ FORBIDDEN_PATTERNS = [
     (re.compile(r"\bsk-[A-Za-z0-9]{20,}"), "API key"),
     (re.compile(r"\bxox[baprs]-[A-Za-z0-9-]{10,}"), "Slack token"),
     (re.compile(r"VOLC_API_KEY\s*=\s*[A-Za-z0-9]{8,}"), "voice provider key"),
-    (re.compile(r"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "private key"),
+    (re.compile("-----BEGIN" + r" (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"), "private key"),
 ]
 
 #: Synthetic placeholders that are allowed to look like identifiers.
