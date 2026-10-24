@@ -66,6 +66,9 @@ class FakeCatalog:
 
 class FakeConfig:
     projects_root = FakeRecord.cwd
+    provider = "deepseek-account"
+    model = "deepseek-flash"
+    reasoning_effort = "max"
 
 
 def runner(handle=None, events=None):

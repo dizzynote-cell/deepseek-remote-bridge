@@ -3,7 +3,7 @@
 > 手机、平板或另一台电脑打开网页，就能用你主力电脑上的 **DeepSeek Harness** 干活：
 > 真实会话、真实工具、真实批准，右上角是**原生账户余额**。
 
-**v1.6.2** · 作者 [xiyannan](https://github.com/dizzynote-cell) · MIT · 未部署、无服务器依赖、仓库内不含任何密钥
+**v1.7.0** · 作者 [xiyannan](https://github.com/dizzynote-cell) · MIT · 未部署、无服务器依赖、仓库内不含任何密钥
 
 ![桌面端页面](docs/images/desktop.png)
 
@@ -33,6 +33,8 @@ DeepSeek Harness 很强，但它只在你自己的电脑上。离开电脑时：
   子代理、工作流、计划（todo）、`present`、`load_workspace_dependencies`。
 - **批准与提问能回到手机**：工具要授权、模型要提问时，网页里出现待处理卡片，点一下就把决定送回原请求。
 - **执行计划与实时进度**：模型用 `todo_write` 拆步骤时，网页显示 3/3 完成、当前在跑哪个工具、用了多久。
+- **模型与强度可选**：输入框左侧的「模型」按钮可以切 `V4.1-Flash` / `V4-Pro` 和 `off/low/high/max`，
+  切换会重启该会话的运行时并保留全部历史；新会话默认值也可单独设置。
 - **权限可控**：输入框左侧有「权限」选择器（`workspace-write` / `danger-full-access`），
   可以给单个会话切换，也可以在设置里定"新会话默认权限"。
 - **原生余额**：右上角是 DeepSeek 账户的真实钱包（充值/赠送分开、多币种不加总），失败就显示"暂不可用"，不会显示 0。
@@ -186,7 +188,7 @@ DSH_BRIDGE_SIBLING_URL=https://<入口页域名>/
 ## 开发与测试
 
 ```powershell
-python tests\run_tests.py        # 120 个 Python 用例 + 2 个 Node 页面契约用例
+python tests\run_tests.py        # 131 个 Python 用例 + 2 个 Node 页面契约用例
 ```
 
 真实联调（只创建自己的测试会话/目录）：`live_check.py`、`live_interactions.py`、

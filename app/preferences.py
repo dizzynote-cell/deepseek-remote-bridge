@@ -19,6 +19,9 @@ DEFAULTS: dict[str, Any] = {
     # bridge configuration default"; it is validated against the live catalog
     # before use, never trusted blindly.
     "permissionPreset": "",
+    # New-session model route; empty means "use the bridge configuration".
+    "model": "",
+    "reasoningEffort": "",
 }
 
 

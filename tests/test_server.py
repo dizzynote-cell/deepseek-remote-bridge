@@ -24,6 +24,20 @@ class FakeTasks:
     def ensure_open(self, session_id):
         return None
 
+    def route_for(self, session_id):
+        from app.dsh_runtime import RouteKey
+
+        return RouteKey("deepseek-account", "deepseek-flash", "max")
+
+    def switch_route(self, session_id, model, effort):
+        if session_id == "session-running":
+            from app.tasks import TaskRejected
+
+            raise TaskRejected("该会话正在运行，等它结束后再切换模型。", code="session_running", status=409)
+        from app.dsh_runtime import RouteKey
+
+        return RouteKey("deepseek-account", model, effort)
+
     def active_task_for(self, session_id):
         return None
 
@@ -283,6 +297,53 @@ class HttpSurfaceTests(unittest.TestCase):
     def test_static_traversal_is_blocked(self):
         _, port = self.build()
         self.assertEqual(get(f"http://127.0.0.1:{port}/..%2f..%2fetc%2fpasswd")[0], 404)
+
+    def test_model_catalog_and_default_update(self):
+        _, port = self.build()
+        status, body, _ = get(f"http://127.0.0.1:{port}/api/models")
+        payload = json.loads(body)
+        self.assertEqual(status, 200)
+        self.assertEqual([item["id"] for item in payload["models"]], ["deepseek-flash", "deepseek-v4-pro"])
+        self.assertEqual([item["id"] for item in payload["efforts"]], ["off", "low", "high", "max"])
+        self.assertEqual(payload["bridgeDefault"], {"model": "deepseek-flash", "effort": "high"})
+
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/models",
+            method="POST",
+            payload={"model": "deepseek-v4-pro", "effort": "high"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["bridgeDefault"], {"model": "deepseek-v4-pro", "effort": "high"})
+
+    def test_model_switch_for_a_session(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/models",
+            method="POST",
+            payload={"threadId": "session-demo", "model": "deepseek-v4-pro", "effort": "low"},
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(json.loads(body)["session"], {"model": "deepseek-v4-pro", "effort": "low"})
+
+    def test_unknown_model_is_refused(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/models",
+            method="POST",
+            payload={"model": "gpt-4o", "effort": "high"},
+        )
+        self.assertEqual(status, 400)
+        self.assertEqual(json.loads(body)["code"], "unknown_model")
+
+    def test_model_switch_is_refused_while_running(self):
+        _, port = self.build()
+        status, body, _ = get(
+            f"http://127.0.0.1:{port}/api/models",
+            method="POST",
+            payload={"threadId": "session-running", "model": "deepseek-v4-pro", "effort": "low"},
+        )
+        self.assertEqual(status, 409)
+        self.assertEqual(json.loads(body)["code"], "session_running")
 
     def test_permission_catalog_and_switch(self):
         _, port = self.build()

@@ -16,6 +16,9 @@ const els = {
   settings: document.querySelector('#settings'), settingsDialog: document.querySelector('#settings-dialog'),
   closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done'),
   permissionSelect: document.querySelector('#permission-select'), defaultPermission: document.querySelector('#default-permission'),
+  modelChip: document.querySelector('#model-chip'), modelMenu: document.querySelector('#model-menu'),
+  modelOptions: document.querySelector('#model-options'), effortOptions: document.querySelector('#effort-options'),
+  modelNote: document.querySelector('#model-note'),
   permissionNote: document.querySelector('#permission-note'), activity: document.querySelector('#activity-strip')
 };
 let threads = [], managedProjects = [], selected = null, threadLoading = false, lastThreadSignature = '';
@@ -30,6 +33,86 @@ const imageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'ic
 const statusLabels = { completed: '已完成', failed: '失败', interrupted: '已中断', cancelled: '已取消', in_progress: '进行中', running: '进行中' };
 
 let permissionCatalog = { options: [], defaultPreset: null, bridgeDefault: '' };
+
+let modelCatalog = { models: [], efforts: [], bridgeDefault: { model: '', effort: '' }, session: null };
+let modelSelection = { model: '', effort: '' };
+
+function modelLabels() {
+  const model = modelCatalog.models.find(item => item.id === modelSelection.model);
+  const effort = modelCatalog.efforts.find(item => item.id === modelSelection.effort);
+  return {
+    model: model ? model.short : (modelSelection.model || '模型'),
+    effort: effort ? effort.name : (modelSelection.effort || ''),
+  };
+}
+
+function paintModelChip() {
+  if (!els.modelChip) return;
+  const labels = modelLabels();
+  els.modelChip.textContent = `${labels.model}${labels.effort ? ' · ' + labels.effort : ''}`;
+  els.modelChip.title = `${labels.model}${labels.effort ? ' · 强度 ' + labels.effort : ''}（点击切换）`;
+}
+
+function paintModelMenu() {
+  if (!els.modelOptions || !els.effortOptions) return;
+  els.modelOptions.innerHTML = modelCatalog.models.map(item => `
+    <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.model}" class="model-option ${item.id === modelSelection.model ? 'current' : ''}" data-model="${esc(item.id)}">
+      <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
+    </button>`).join('');
+  els.effortOptions.innerHTML = modelCatalog.efforts.map(item => `
+    <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.effort}" class="model-option ${item.id === modelSelection.effort ? 'current' : ''}" data-effort="${esc(item.id)}">
+      <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
+    </button>`).join('');
+  els.modelOptions.querySelectorAll('[data-model]').forEach(button => {
+    button.onclick = () => applyModel(button.dataset.model, modelSelection.effort);
+  });
+  els.effortOptions.querySelectorAll('[data-effort]').forEach(button => {
+    button.onclick = () => applyModel(modelSelection.model, button.dataset.effort);
+  });
+  if (els.modelNote) {
+    els.modelNote.textContent = modelCatalog.note || '';
+  }
+}
+
+async function loadModels(threadId) {
+  try {
+    const query = threadId ? `?threadId=${encodeURIComponent(threadId)}` : '';
+    const data = await (await bridgeFetch('/api/models' + query)).json();
+    modelCatalog = data;
+    modelSelection = {
+      model: data.session?.model || data.bridgeDefault?.model || '',
+      effort: data.session?.effort || data.bridgeDefault?.effort || '',
+    };
+  } catch { /* keep the last catalog */ }
+  paintModelChip();
+  paintModelMenu();
+}
+
+async function applyModel(model, effort) {
+  if (!model || !effort) return;
+  const threadId = selected;
+  els.modelChip.disabled = true;
+  try {
+    const response = await bridgeFetch('/api/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(threadId ? { threadId, model, effort } : { model, effort }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || '切换失败');
+    modelSelection = { model, effort };
+    paintModelChip();
+    paintModelMenu();
+    showTaskNotice(threadId
+      ? `本会话模型已切换为「${modelLabels().model} · ${modelLabels().effort}」（运行时已重启）`
+      : `新会话默认模型：${modelLabels().model} · ${modelLabels().effort}`);
+    if (threadId) await loadThread(threadId, true);
+  } catch (error) {
+    showTaskNotice(`模型切换失败：${error.message}`, true);
+  } finally {
+    els.modelChip.disabled = false;
+  }
+}
 
 function projectName(cwd) { return window.projectDisplay.name(cwd, managedProjects); }
 
@@ -378,6 +461,7 @@ async function loadThread(id, silent = false, showOlder = false) {
     els.meta.textContent = `项目：${projectName(summary?.cwd || t.cwd)} · ${statusLabel(t.status)} · ${total} 轮${preset}${plan} · ID：${t.id || id}`;
     renderActivity(t);
     syncThreadPermission(id).catch(() => {});
+    loadModels(id).catch(() => {});
     if (!silent || signature !== lastThreadSignature) {
       const nearBottom = els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 140;
       const remaining = Math.max(0, total - visible);
@@ -447,6 +531,7 @@ document.addEventListener('keydown', event => { if (event.key === 'Escape') togg
 async function boot() {
   await window.voiceUI?.boot();
   await loadPermissionCatalog();
+  await loadModels();
   await loadSwitchTargets();
   await loadThreads(false);
   loadStatus();
@@ -521,6 +606,23 @@ function showTaskNotice(message, error = false) {
 }
 
 els.permissionSelect.onchange = () => changeSessionPermission(els.permissionSelect.value);
+
+if (els.modelChip) {
+  els.modelChip.onclick = event => {
+    event.stopPropagation();
+    const open = els.modelMenu.hidden;
+    els.modelMenu.hidden = !open;
+    els.modelChip.setAttribute('aria-expanded', String(open));
+    if (open) paintModelMenu();
+  };
+  els.modelMenu.onclick = event => event.stopPropagation();
+  document.addEventListener('click', () => {
+    if (!els.modelMenu.hidden) {
+      els.modelMenu.hidden = true;
+      els.modelChip.setAttribute('aria-expanded', 'false');
+    }
+  });
+}
 if (els.defaultPermission) els.defaultPermission.onchange = () => changeDefaultPermission(els.defaultPermission.value);
 
 els.settings.onclick = () => {

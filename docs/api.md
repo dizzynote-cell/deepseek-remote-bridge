@@ -228,6 +228,36 @@ POST <base>/api/interactions/respond
 
 命中选项标签时按 `selected` 提交，否则作为 `custom` 提交。已被处理或不存在的请求返回 `404 interaction_missing`。
 
+## 模型与推理强度
+
+```http
+GET <base>/api/models[?threadId=<sessionId>]
+```
+
+```json
+{"provider": "deepseek-account",
+ "models": [{"id": "deepseek-flash", "name": "DeepSeek-V4.1-Flash", "short": "V4.1 Flash"},
+            {"id": "deepseek-v4-pro", "name": "DeepSeek-V4-Pro", "short": "V4 Pro"}],
+ "efforts": [{"id": "off", "name": "关闭"}, {"id": "low", "name": "低"},
+             {"id": "high", "name": "高"}, {"id": "max", "name": "最大"}],
+ "bridgeDefault": {"model": "deepseek-flash", "effort": "max"},
+ "session": {"model": "deepseek-v4-pro", "effort": "low", "route": "deepseek-account/deepseek-v4-pro/low"},
+ "note": "切换模型会重启该会话所在的运行时…"}
+```
+
+`session` 只在传入 `threadId` 且桥知道该会话的路由时出现；`bridgeDefault` 是新会话默认值。
+
+```http
+POST <base>/api/models
+{"model": "deepseek-v4-pro", "effort": "low"}                  # 只改新会话默认
+{"threadId": "session-<id>", "model": "deepseek-v4-pro", "effort": "low"}   # 切换本会话
+```
+
+切换本会话的真实行为：SDK 的模型固定在运行时进程启动时，所以桥会**停掉该会话原来那个运行时**，
+用新模型再起一个，并把同一个会话 `session/resume` 过去；下一轮写下的 `request/header` 就是新模型。
+因此：转录里旧轮次仍显示旧模型（这是真的历史）；同模型上还有会话在跑时返回 `409 route_busy`；
+本会话自己在跑时返回 `409 session_running`；未知模型/强度返回 `400 unknown_model` / `unknown_effort`。
+
 ## 权限预设
 
 ```http

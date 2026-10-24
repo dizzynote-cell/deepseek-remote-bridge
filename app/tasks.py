@@ -16,8 +16,13 @@ import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
+import json
+from pathlib import Path
+
 from .dsh_rpc import RpcError
+from .dsh_runtime import RouteKey
 from .history_view import project_session
+from . import models
 
 TASK_TERMINAL = {"completed", "failed", "interrupted", "cancelled"}
 
@@ -86,7 +91,7 @@ class LocalTask:
 class TaskRunner:
     """Submit prompts and follow them to a durable terminal state."""
 
-    def __init__(self, config, pool, catalog, returned_files, on_finished=None):
+    def __init__(self, config, pool, catalog, returned_files, on_finished=None, routes_path=None):
         self.config = config
         self.pool = pool
         self.catalog = catalog
@@ -96,6 +101,11 @@ class TaskRunner:
         self.tasks: dict[str, LocalTask] = {}
         self.active_by_session: dict[str, str] = {}
         self.worker_timeout = 6 * 3600.0
+        # Which route each session last ran on. Persisted so a bridge restart
+        # does not silently move a pro session back to the default model.
+        self.routes_path: Path | None = Path(routes_path) if routes_path else None
+        self.session_routes: dict[str, RouteKey] = {}
+        self._load_routes()
 
     # -- public API -----------------------------------------------------
     def submit(self, session_id: str, content_blocks: list[dict[str, Any]], steered: bool = False) -> LocalTask:
@@ -142,11 +152,19 @@ class TaskRunner:
         content_blocks: list[dict[str, Any]],
         session_id: str | None = None,
         preset: str | None = None,
+        model: str | None = None,
+        effort: str | None = None,
     ) -> LocalTask:
         if not cwd:
             raise TaskRejected("缺少工作目录")
         session_id = session_id or f"session-{uuid.uuid4()}"
-        handle = self.pool.acquire()
+        key = RouteKey(
+            self.config.provider,
+            model or self.config.model,
+            effort or self.config.reasoning_effort,
+        )
+        handle = self.pool.acquire(key)
+        self._remember_route(session_id, key)
         task = LocalTask(
             id=f"task-{uuid.uuid4()}",
             session_id=session_id,
@@ -179,6 +197,51 @@ class TaskRunner:
             raise TaskRejected(f"创建会话失败：{error}", code="create_failed", status=502) from None
         threading.Thread(target=self._follow, args=(task, handle), name=f"task-{task.id}", daemon=True).start()
         return task
+
+    def switch_route(self, session_id: str, model: str, effort: str) -> RouteKey:
+        """Move a session to another model route by restarting that route's runtime.
+
+        The SDK fixes the route per runtime process, so this is the only honest
+        way to change a session's model: stop the old runtime, resume the very
+        same session on the new one. The harness appends a new ``request/header``,
+        which is why the transcript still shows the earlier model's turns.
+        """
+        target = RouteKey(self.config.provider, model, effort)
+        with self.lock:
+            current = self.session_routes.get(session_id) or self.default_route()
+        if target == current:
+            self._remember_route(session_id, current)
+            return current
+        if self.is_running(session_id):
+            raise TaskRejected("该会话正在运行，等它结束后再切换模型。", code="session_running", status=409)
+        with self.lock:
+            busy = [
+                other for other, task_id in self.active_by_session.items()
+                if other != session_id and (self.session_routes.get(other) or self.default_route()) == current
+            ]
+        if busy:
+            raise TaskRejected(
+                f"该模型上还有 {len(busy)} 个会话在运行，等它们结束后再切换。",
+                code="route_busy",
+                status=409,
+            )
+        self.pool.release(current)
+        handle = self.pool.acquire(target)
+        try:
+            with handle.lock:
+                handle.call("session/resume", {"sessionId": session_id}, timeout=300.0)
+                handle.opened_sessions.add(session_id)
+        except RpcError as error:
+            if is_busy_error(error):
+                raise TaskRejected(
+                    "该会话正被另一个 DeepSeek Harness 进程占用，无法切换模型。",
+                    code="session_busy",
+                    status=409,
+                ) from None
+            raise TaskRejected(f"切换后恢复会话失败：{error}", code="switch_failed", status=502) from None
+        self._remember_route(session_id, target)
+        self.catalog.invalidate(session_id)
+        return target
 
     def ensure_open(self, session_id: str) -> None:
         """Make a session live in our runtime so its settings can be changed."""
@@ -231,8 +294,58 @@ class TaskRunner:
             except Exception:
                 pass
 
+    def default_route(self) -> RouteKey:
+        return RouteKey(
+            self.config.provider,
+            self.config.model,
+            self.config.reasoning_effort,
+        )
+
+    def route_for(self, session_id: str) -> RouteKey:
+        with self.lock:
+            return self.session_routes.get(session_id) or self.default_route()
+
     def _handle_for(self, session_id: str):
-        return self.pool.acquire()
+        return self.pool.acquire(self.route_for(session_id))
+
+    def _remember_route(self, session_id: str, key: RouteKey) -> None:
+        with self.lock:
+            self.session_routes[session_id] = key
+        self._save_routes()
+
+    def _load_routes(self) -> None:
+        if self.routes_path is None or not self.routes_path.is_file():
+            return
+        try:
+            data = json.loads(self.routes_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return
+        if not isinstance(data, dict):
+            return
+        for session_id, value in data.items():
+            if not isinstance(value, dict):
+                continue
+            model = str(value.get("model") or "")
+            effort = str(value.get("effort") or "")
+            if model not in models.MODEL_IDS or effort not in models.EFFORT_IDS:
+                continue
+            self.session_routes[str(session_id)] = RouteKey(self.config.provider, model, effort)
+
+    def _save_routes(self) -> None:
+        if self.routes_path is None:
+            return
+        with self.lock:
+            payload = {
+                session_id: {"model": key.model, "effort": key.reasoning_effort}
+                for session_id, key in self.session_routes.items()
+            }
+        try:
+            self.routes_path.parent.mkdir(parents=True, exist_ok=True)
+            temp = self.routes_path.with_suffix(".tmp")
+            temp.write_text(json.dumps(payload, ensure_ascii=False, indent=1), encoding="utf-8")
+            temp.replace(self.routes_path)
+        except OSError:
+            pass
 
     def _ensure_open(self, handle, session_id: str) -> None:
         with handle.lock:

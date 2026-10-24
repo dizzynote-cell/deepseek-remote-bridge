@@ -23,7 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
-from . import pricing
+from . import models, pricing
 from .attachments import AttachmentError, AttachmentStore, is_image_path, read_file_bounded
 from .config import BridgeConfig
 from .dsh_adapter import AdapterError
@@ -235,6 +235,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/preferences":
                 self._json(state.preferences.snapshot())
                 return
+            if path == "/api/models":
+                self._api_models(query)
+                return
             if path == "/api/permissions":
                 self._api_permissions(query)
                 return
@@ -257,6 +260,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/preferences":
                 self._api_preferences()
+                return
+            if path == "/api/models":
+                self._api_set_model()
                 return
             if path == "/api/permissions":
                 self._api_set_permission()
@@ -343,6 +349,55 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         files = self.state.returned_files.collect(texts)
         if files:
             thread["bridgeAttachments"] = files
+
+    # -- models ----------------------------------------------------------
+    def _bridge_route(self):
+        preferences = self.state.preferences.snapshot()
+        model = preferences.get("model") or self.state.config.model
+        effort = preferences.get("reasoningEffort") or self.state.config.reasoning_effort
+        try:
+            return models.resolve(self.state.config.provider, model, effort, self.state.config.model, self.state.config.reasoning_effort)
+        except models.RouteError:
+            return models.resolve(self.state.config.provider, None, None, self.state.config.model, self.state.config.reasoning_effort)
+
+    def _api_models(self, query: dict[str, list[str]]) -> None:
+        session_id = _first(query, "threadId") or ""
+        route = None
+        if session_id:
+            key = self.state.tasks.route_for(session_id)
+            route = models.Route(self.state.config.provider, key.model, key.reasoning_effort)
+        bridge = self._bridge_route()
+        self._json(models.catalog(self.state.config.provider, bridge.model, bridge.effort, route))
+
+    def _api_set_model(self) -> None:
+        try:
+            payload = self._read_json()
+        except ValueError as error:
+            self._error(400, str(error), "bad_request")
+            return
+        session_id = str(payload.get("threadId") or "").strip()
+        bridge = self._bridge_route()
+        try:
+            route = models.resolve(
+                self.state.config.provider,
+                str(payload.get("model") or ""),
+                str(payload.get("effort") or ""),
+                bridge.model,
+                bridge.effort,
+            )
+        except models.RouteError as error:
+            self._error(400, str(error), error.code)
+            return
+        if not session_id:
+            self.state.preferences.update({"model": route.model, "reasoningEffort": route.effort})
+            self._json({"ok": True, "bridgeDefault": {"model": route.model, "effort": route.effort}})
+            return
+        try:
+            key = self.state.tasks.switch_route(session_id, route.model, route.effort)
+        except TaskRejected as error:
+            self._error(error.http_status, str(error), error.code)
+            return
+        self._json({"ok": True, "session": {"model": key.model, "effort": key.reasoning_effort}})
 
     # -- permissions -----------------------------------------------------
     def _api_permissions(self, query: dict[str, list[str]]) -> None:
@@ -532,7 +587,13 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                     preset = str(state.preferences.snapshot().get("permissionPreset") or state.config.permission_preset)
                 staged, images = state.attachments.stage(session_id, files)
                 blocks = _content_blocks(text + state.attachments.prompt_suffix(staged), images)
-                task = state.tasks.create_session(cwd, blocks, session_id=session_id, preset=preset or None)
+                bridge_route = self._bridge_route()
+                model = str(payload.get("model") or "").strip() or bridge_route.model
+                effort = str(payload.get("effort") or "").strip() or bridge_route.effort
+                task = state.tasks.create_session(
+                    cwd, blocks, session_id=session_id, preset=preset or None,
+                    model=model, effort=effort,
+                )
                 if title:
                     task.detail["title"] = title
                 self._json({"taskId": task.id, "threadId": task.session_id})

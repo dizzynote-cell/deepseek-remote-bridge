@@ -1,5 +1,21 @@
 # 更新日志
 
+## 1.7.0 — 2026-10-25
+
+输入框左侧多了「模型」：可以选 V4.1-Flash / V4-Pro，以及四档推理强度。
+
+- `GET /api/models` 返回模型表、强度表、新会话默认值和（传入 `threadId` 时）本会话路由；
+  `POST /api/models` 不带 `threadId` 改新会话默认，带 `threadId` 切换本会话。
+- 切换是**真的**：SDK 的模型固定在运行时进程上，桥会停掉该会话原来的运行时，用新模型重启，
+  再把同一个会话 `session/resume` 过去；实测同一份会话日志先后出现
+  `deepseek-account/deepseek-flash` 与 `deepseek-account/deepseek-v4-pro` 两个 `request/header`。
+- 保护：本会话在跑 → `409 session_running`；同模型上还有别的会话在跑 → `409 route_busy`；
+  未知模型/强度 → `400`。会话路由持久化到 `state/data/session-routes.json`，桥重启不会把 pro 会话
+  悄悄退回默认模型。
+- 页面上是一个「V4.1 Flash · 最大」样式的按钮，点开分组选择；没有选中会话时改的是新会话默认值。
+- 测试：新增 `tests/test_models.py`（7 个用例）与 4 个 HTTP 用例；新增 `tests/live_models.py`（11/11，
+  真实切换 + 第二轮在新模型上完成 + 未知模型拒绝 + 切回原路由）；合计 131 个 Python 用例。
+
 ## 1.6.2 — 2026-10-25
 
 README 换成真实界面截图。

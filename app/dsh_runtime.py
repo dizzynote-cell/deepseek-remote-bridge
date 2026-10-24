@@ -209,6 +209,21 @@ class RuntimePool:
         self.last_error = reason
 
     # -- teardown -------------------------------------------------------
+    def release(self, key: RouteKey) -> None:
+        """Stop one route's runtime, leaving other routes untouched."""
+        with self.lock:
+            handle = self.handles.pop(key, None)
+        if handle is None:
+            return
+        try:
+            handle.process.close()
+        except Exception:  # noqa: BLE001 - a dead runtime is already released
+            pass
+
+    def keys(self) -> list[RouteKey]:
+        with self.lock:
+            return list(self.handles.keys())
+
     def shutdown(self) -> None:
         with self.lock:
             handles = list(self.handles.values())

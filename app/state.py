@@ -44,7 +44,10 @@ class BridgeState:
             [config.projects_root, config.standalone_dir, config.uploads_dir],
             config.attachments_max_bytes,
         )
-        self.tasks = TaskRunner(config, self.pool, self.catalog, self.returned_files, self._on_task_finished)
+        self.tasks = TaskRunner(
+            config, self.pool, self.catalog, self.returned_files, self._on_task_finished,
+            routes_path=config.data_dir / "session-routes.json",
+        )
         self.interactions = InteractionBridge(self.adapter, self.catalog)
         self.preferences = Preferences(config.data_dir / "preferences.json")
         self.voice = VoiceService(
@@ -146,7 +149,7 @@ class BridgeState:
             "permissionSwitch": True,
             "voice": bool(self.voice.available and self.preferences.snapshot().get("voiceEnabled", True)),
             "billing": "balance",
-            "modelSelection": False,
+            "modelSelection": True,
         }
 
     def bridge_info(self) -> dict[str, Any]:
