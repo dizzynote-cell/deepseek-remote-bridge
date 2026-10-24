@@ -5,9 +5,11 @@
 
 **v1.4.1** · 作者 [xiyannan](https://github.com/dizzynote-cell) · MIT · 未部署、无服务器依赖、仓库内不含任何密钥
 
-![会话示例：计划与进度](docs/images/conversation.png)
+![桌面端页面](docs/images/desktop.png)
 
-<p align="center"><img src="docs/images/mobile.png" width="320" alt="手机界面" /></p>
+<p align="center"><img src="docs/images/mobile.png" width="320" alt="手机端页面" /></p>
+
+<sub>截图来自一个隔离的演示实例：会话内容为演示数据，余额用占位数字代替。</sub>
 
 ---
 
