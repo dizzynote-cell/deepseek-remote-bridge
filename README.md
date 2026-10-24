@@ -50,6 +50,7 @@ Python 桥（本项目）—— 会话目录、历史投影、任务状态、余
 | 附件（图片/文档） | ✅ | 图片内联为 image block；文档落到桥的 uploads 目录并给出绝对路径 |
 | 返回文件 | ✅ | 从工具结果里识别本机文件，网页预览/下载/本机打开 |
 | 原生账户余额 | ✅ | 充值钱包与赠送钱包分开显示，多币种不相加 |
+| 手机网页 / PWA | ✅ | 响应式 + 应用到主屏幕；Service Worker 只缓存静态资源，不缓存 `/api` 与页面 |
 | 模型/推理强度切换 | ❌ | 一个运行时固定一条路由；桥不提供假选择器 |
 | 语音播报 | ✅（需配置） | 可选：本机 TTS 合成 + 本地缓存，浏览器只拿缓存键与音频地址 |
 | 飞书 / 公网云程序 | ❌ | 本阶段不部署服务器；相关配置项保留且默认关闭 |
@@ -90,6 +91,8 @@ python bridge.py --check                # 启动、自检、退出（CI/排障�
 ```
 
 `--check` 会真的拉起一次 Harness 运行时并访问适配器，退出码 0 表示运行时与适配器都可用。
+
+手机上可以「添加到主屏幕」当独立应用用（`web/manifest.webmanifest` + 图标 + Service Worker 只缓存静态资源，不缓存任何 `/api` 与页面导航）。安装要求安全上下文：`https://` 或 `localhost`；用局域网 IP 的 http 打开时退化为普通网页。
 
 
 也可以用 `DeepSeek Remote Bridge.cmd` 或 `scripts\` 下的脚本托管：
@@ -216,7 +219,8 @@ python tests\live_files.py       --base http://127.0.0.1:8766           # 文件
 - **stdout 噪声**：官方 DeepSeek 账户模型适配器会往 stdout 打一行模型列表诊断（与 SDK 文档「stdout 只放协议帧」冲突），桥按行跳过非 JSON 帧并计数，不影响协议。
 - **沙箱依赖宿主环境**：在验证机上 `workspace-write` 预设下 pwsh 子进程以 `3221225794`（DLL 初始化失败）退出；这是宿主沙箱问题，桥如实显示工具结果。可用 `danger-full-access` 预设规避（该预设按 Harness 定义同时关闭批准）。
 - **附件只走两条真实通道**：图片内联给模型；其他文件落到桥目录并给出绝对路径让模型读，不做模型侧的“附件解析”。
-- **云端与飞书未实现**：本阶段没有部署服务器；飞书需要一个独立应用或入口页统一路由，见 [`docs/feishu.md`](docs/feishu.md)。
+- **云端与飞书未实现**：本阶段没有部署服务器；飞书登录与接入的施工图见 [`docs/feishu-setup.md`](docs/feishu-setup.md)，阻塞点见 [`docs/feishu.md`](docs/feishu.md)。
+- **还没做的功能**：与官方 SDK 的逐项对照、以及手机场景的缺口与优先级，见 [`docs/roadmap.md`](docs/roadmap.md)。
 
 ## 隐私
 

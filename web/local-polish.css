@@ -1,12 +1,12 @@
 .composer{position:relative;z-index:8}.composer button:disabled{cursor:not-allowed}.task-strip.restart{background:#54231b;color:#ffd0b8;border-color:#b9563f;font-weight:700}.summary span:last-child{display:flex;gap:8px}.summary button{padding:3px 5px}.balance-wrap{position:relative}button.balance{color:var(--text);text-align:left;cursor:pointer}body.mobile-ui .shell,body.mobile-ui .conversation{height:100vh;height:100dvh}body.mobile-ui .conversation{min-height:0;overflow:hidden}body.mobile-ui .messages{min-height:0;padding-bottom:20px}body.mobile-ui .composer{padding:9px 10px max(9px,env(safe-area-inset-bottom));gap:8px}body.mobile-ui .composer textarea{font-size:16px;min-height:46px}body.mobile-ui .composer button{height:46px;padding:0 15px}body.mobile-ui .task-strip,body.mobile-ui .file-list{padding:8px 12px}
 /* Harness transcript details */
 .thread-live{color:var(--accent);margin-left:6px;font-size:9px}
-.status-dot.running{background:var(--accent);box-shadow:0 0 0 3px rgba(87,217,154,.16)}
+.status-dot.running{background:var(--accent);box-shadow:0 0 0 3px rgba(77,107,254,.18)}
 .tool-name{color:var(--text);font-weight:600}
 .tool-state{margin-left:8px;color:var(--muted)}
 .tool-failed .tool-state{color:#ff8a8a}
 .tool-running .tool-state{color:var(--accent)}
-.bridge-notice{margin:8px 0;padding:7px 12px;border-left:2px solid #47515f;border-radius:0 8px 8px 0;background:#0f1318;color:var(--muted);font-size:12px;line-height:1.6}
+.bridge-notice{margin:8px 0;padding:7px 12px;border-left:2px solid #3a476b;border-radius:0 8px 8px 0;background:#0d1424;color:var(--muted);font-size:12px;line-height:1.6}
 .bridge-notice.approval{border-left-color:#d9a441;color:#e8c98c}
 .bridge-notice.error{border-left-color:#ff6b78;color:#ffb3b9}
 .bridge-usage{margin:6px 0 0;color:var(--muted);font-size:11px;font-variant-numeric:tabular-nums}
@@ -34,5 +34,5 @@ dialog.settings-dialog header{display:flex;align-items:center;justify-content:sp
 dialog.settings-dialog header strong{font-size:14px}
 dialog.settings-dialog header button{border:0;background:transparent;color:var(--muted);font-size:20px;cursor:pointer;line-height:1}
 dialog.settings-dialog footer{display:flex;justify-content:flex-end;margin-top:14px}
-dialog.settings-dialog footer button{border:1px solid #2f7f5c;border-radius:9px;background:#173d2e;color:#d8ffe9;padding:8px 16px;cursor:pointer}
+dialog.settings-dialog footer button{border:1px solid #3f58c9;border-radius:9px;background:#1a2350;color:#dfe6ff;padding:8px 16px;cursor:pointer}
 body.mobile-ui button.icon-button{width:30px;height:30px;font-size:13px}

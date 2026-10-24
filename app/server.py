@@ -536,6 +536,10 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return
         suffix = path.suffix.lower()
         mime = "text/javascript; charset=utf-8" if suffix == ".js" else (mimetypes.guess_type(path.name)[0] or "application/octet-stream")
+        if suffix == ".webmanifest":
+            mime = "application/manifest+json"
+        elif suffix == ".svg":
+            mime = "image/svg+xml"
         if suffix in TEXT_CONTENT_TYPES and "charset" not in mime:
             mime += "; charset=utf-8"
         extra = {}

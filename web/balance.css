@@ -11,7 +11,14 @@
   align-content: center;
   gap: 3px;
   text-align: left;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--panel2);
+  color: var(--text);
+  cursor: pointer;
 }
+.balance:hover { border-color: var(--accent); }
+.balance[aria-expanded="true"] { border-color: var(--accent); background: #1b2540; }
 .balance-labels {
   display: flex;
   align-items: baseline;

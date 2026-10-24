@@ -69,3 +69,33 @@ for (const asset of assets) {
 }
 
 console.log('UI contract passed: assets, base path, balance, provider menu, voice');
+
+// 8. PWA shell: manifest, icons, theme colour, and a cache policy that never
+// touches API responses or page navigations.
+const manifestPath = path.join(web, 'manifest.webmanifest');
+assert.ok(fs.existsSync(manifestPath), 'manifest.webmanifest missing');
+const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+assert.equal(manifest.display, 'standalone');
+assert.equal(manifest.start_url, './');
+assert.ok(Array.isArray(manifest.icons) && manifest.icons.length >= 2, 'manifest icons missing');
+for (const icon of manifest.icons) {
+  assert.ok(fs.existsSync(path.join(web, icon.src)), `missing manifest icon ${icon.src}`);
+}
+assert.match(html, /rel="manifest"/);
+assert.match(html, /name="theme-color" content="#4d6bfe"/);
+
+const sw = fs.readFileSync(path.join(web, 'sw.js'), 'utf8');
+assert.match(sw, /'\/api\/'/, 'service worker must skip API requests');
+assert.match(sw, /request\.mode === 'navigate'/, 'service worker must not cache navigations');
+
+// 9. The palette is DeepSeek blue, not the upstream Codex green.
+const palette = ['styles.css', 'balance.css', 'voice.css', 'provider-menu.css', 'local-polish.css']
+  .map(name => fs.readFileSync(path.join(web, name), 'utf8'))
+  .join('\n');
+for (const green of ['#57d99a', '#248a67', '#64d9a4', '#7de2ae', '#173d2e', '#2f7f5c']) {
+  assert.ok(!palette.toLowerCase().includes(green), `leftover Codex green ${green}`);
+}
+assert.match(palette, /#4d6bfe/i);
+
+console.log('PWA and palette checks passed');
+

@@ -8,9 +8,9 @@ html,body{width:100%;height:100%;overflow:hidden}
 .messages{flex:1;min-height:0;height:0;overflow-y:scroll;overflow-x:hidden;overscroll-behavior:contain;scrollbar-gutter:stable}
 .turn,.bubble,.commentary,.tool{max-width:100%;min-width:0}
 .bubble,.commentary,.tool pre{overflow-wrap:anywhere;word-break:break-word}
-.threads,.messages,.tool pre{scrollbar-width:auto;scrollbar-color:#596575 #15191f}
+.threads,.messages,.tool pre{scrollbar-width:auto;scrollbar-color:#5a6684 #121827}
 .threads::-webkit-scrollbar,.messages::-webkit-scrollbar,.tool pre::-webkit-scrollbar{width:13px;height:13px}
-.threads::-webkit-scrollbar-track,.messages::-webkit-scrollbar-track,.tool pre::-webkit-scrollbar-track{background:#15191f;border-left:1px solid #262c34}
-.threads::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.tool pre::-webkit-scrollbar-thumb{background:#596575;border:3px solid #15191f;border-radius:999px}
-.threads::-webkit-scrollbar-thumb:hover,.messages::-webkit-scrollbar-thumb:hover,.tool pre::-webkit-scrollbar-thumb:hover{background:#748195}
+.threads::-webkit-scrollbar-track,.messages::-webkit-scrollbar-track,.tool pre::-webkit-scrollbar-track{background:#121827;border-left:1px solid #232b40}
+.threads::-webkit-scrollbar-thumb,.messages::-webkit-scrollbar-thumb,.tool pre::-webkit-scrollbar-thumb{background:#5a6684;border:3px solid #121827;border-radius:999px}
+.threads::-webkit-scrollbar-thumb:hover,.messages::-webkit-scrollbar-thumb:hover,.tool pre::-webkit-scrollbar-thumb:hover{background:#7c88a6}
 @media(max-width:800px){.head-actions{gap:5px}.mode{max-width:190px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}}

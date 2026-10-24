@@ -18,5 +18,13 @@
     if (input instanceof Request) return fetch(new Request(window.bridgeUrl(input.url), input), init);
     return fetch(input, init);
   };
+
+  // Install as a home-screen app. Service workers need a secure context, so this
+  // quietly does nothing when the page is opened over plain http on the LAN.
+  if ('serviceWorker' in navigator && window.isSecureContext) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register(window.bridgeUrl('sw.js'), { scope: normalized }).catch(() => {});
+    });
+  }
   window.bridgeEscape = value => String(value ?? '').replace(/[&<>"']/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[c]));
 })();

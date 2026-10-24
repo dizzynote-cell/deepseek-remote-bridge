@@ -252,6 +252,17 @@ class HttpSurfaceTests(unittest.TestCase):
         _, port = self.build()
         self.assertEqual(get(f"http://127.0.0.1:{port}/..%2f..%2fetc%2fpasswd")[0], 404)
 
+    def test_manifest_is_served_with_the_manifest_type(self):
+        (self.web / "manifest.webmanifest").write_text("{}", encoding="utf-8")
+        (self.web / "favicon.svg").write_text("<svg/>", encoding="utf-8")
+        _, port = self.build()
+        status, _, headers = get(f"http://127.0.0.1:{port}/manifest.webmanifest")
+        content_type = {key.lower(): value for key, value in headers.items()}.get("content-type")
+        self.assertEqual(status, 200)
+        self.assertTrue(content_type.startswith("application/manifest+json"), content_type)
+        status, _, headers = get(f"http://127.0.0.1:{port}/favicon.svg")
+        self.assertIn("image/svg+xml", {key.lower(): value for key, value in headers.items()}.get("content-type"))
+
     def test_unknown_api_is_404(self):
         _, port = self.build()
         self.assertEqual(get(f"http://127.0.0.1:{port}/api/nope")[0], 404)

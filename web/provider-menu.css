@@ -7,7 +7,7 @@ button.logo {
   cursor: pointer;
   font: inherit;
   font-weight: 800;
-  color: #06130e;
+  color: #ffffff;
 }
 button.logo:focus-visible,
 .provider-entry:focus-visible {
@@ -46,7 +46,7 @@ button.logo:focus-visible,
 }
 .provider-entry:hover:not(:disabled) { background: var(--panel); }
 .provider-entry:disabled { cursor: not-allowed; opacity: .55; }
-.provider-entry.current { background: #16241d; }
+.provider-entry.current { background: #17204a; }
 .provider-entry span strong { display: block; font-size: 13px; }
 .provider-entry span small { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
 .provider-dot {
