@@ -3,7 +3,7 @@
 > 手机、平板或另一台电脑打开网页，就能用你主力电脑上的 **DeepSeek Harness** 干活：
 > 真实会话、真实工具、真实批准，右上角是**原生账户余额**。
 
-**v1.4.1** · 作者 [xiyannan](https://github.com/dizzynote-cell) · MIT · 未部署、无服务器依赖、仓库内不含任何密钥
+**v1.6.2** · 作者 [xiyannan](https://github.com/dizzynote-cell) · MIT · 未部署、无服务器依赖、仓库内不含任何密钥
 
 ![桌面端页面](docs/images/desktop.png)
 
@@ -186,7 +186,7 @@ DSH_BRIDGE_SIBLING_URL=https://<入口页域名>/
 ## 开发与测试
 
 ```powershell
-python tests\run_tests.py        # 102 个 Python 用例 + 2 个 Node 页面契约用例
+python tests\run_tests.py        # 120 个 Python 用例 + 2 个 Node 页面契约用例
 ```
 
 真实联调（只创建自己的测试会话/目录）：`live_check.py`、`live_interactions.py`、
