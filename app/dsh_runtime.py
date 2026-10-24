@@ -125,8 +125,28 @@ class RuntimePool:
         env["ELECTRON_RUN_AS_NODE"] = "1"
         if self.config.dsh_home is not None:
             env["DSH_HOME"] = str(self.config.dsh_home)
+        # The sdk profile ships `tool-workspace-dependencies` disabled until this
+        # path is present; it tells the model where the bundled Python/Office
+        # dependencies live, exactly as in the desktop app.
+        primary_runtime = self.primary_runtime_dir()
+        if primary_runtime is not None and "DSH_PRIMARY_RUNTIME" not in env:
+            env["DSH_PRIMARY_RUNTIME"] = str(primary_runtime)
         env.setdefault("NO_COLOR", "1")
         return env
+
+    def primary_runtime_dir(self):
+        """Locate the bundled runtime payload next to the installed harness."""
+        try:
+            root = Path(str(self.config.dsh_exe)).parent
+        except (TypeError, ValueError):
+            return None
+        for candidate in (root / "resources" / "runtime" / "primary-runtime", root / "runtime" / "primary-runtime"):
+            try:
+                if (candidate / "runtime.json").is_file():
+                    return candidate
+            except OSError:
+                continue
+        return None
 
     def acquire(self, key: RouteKey | None = None, timeout: float = 180.0) -> RuntimeHandle:
         """Return a ready runtime for ``key``, starting one when needed."""
@@ -224,6 +244,10 @@ def render_patch(patch: dict[str, Any]) -> str:
         # model-facing tool; the bridge supports asking, so mount the official tool.
         "    - id: bridge-tool-ask-user",
         "      name: '@deepseek-ai/dsh-tool-ask-user'",
+        # Presenting deliverables is model-facing in the desktop profile; the sdk
+        # profile leaves it out, so mount the same official plugin here.
+        "    - id: bridge-tool-present",
+        "      name: '@deepseek-ai/dsh-tool-present'",
     ]
     if patch.get("preset"):
         preset = _yaml_scalar(patch["preset"], "permission preset", r"[a-z][a-z0-9-]{0,40}")

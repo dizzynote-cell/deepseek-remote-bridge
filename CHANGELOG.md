@@ -1,5 +1,17 @@
 # 更新日志
 
+## 1.4.1 — 2026-10-24
+
+让桥不依赖桌面窗口也能拿到与桌面端一致的工具集。
+
+- 补丁新增官方 `@deepseek-ai/dsh-tool-present`；`load_workspace_dependencies` 通过自动探测
+  `DSH_PRIMARY_RUNTIME`（`<安装目录>/resources/runtime/primary-runtime`）激活。
+- 实测模型可见工具：26 → **28**（桌面 32）。仍缺 `schedule_create/delete/list/update`：
+  它们需要 `dsh-schedule` 与桌面会话控制器，SDK 组合不含，补丁层面无解。
+- README 增加「不开桌面客户端能用吗」，说明桥自己启动运行时、凭据来源、以及仍需桌面的三件事
+  （重新登录、桌面 profile 的自定义 patch、被桌面打开的会话锁）。
+- 新增 `tests/live_tools.py`（7/7），把工具可用性做成可重跑的检查。
+
 ## 1.4.0 — 2026-10-24
 
 补上「做到哪了、还剩几步、能不能换权限」三件事。

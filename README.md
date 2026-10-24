@@ -51,6 +51,7 @@ Python 桥（本项目）—— 会话目录、历史投影、任务状态、余
 | 返回文件 | ✅ | 从工具结果里识别本机文件，网页预览/下载/本机打开 |
 | 原生账户余额 | ✅ | 充值钱包与赠送钱包分开显示，多币种不相加 |
 | 手机网页 / PWA | ✅ | 响应式 + 应用到主屏幕；Service Worker 只缓存静态资源，不缓存 `/api` 与页面 |
+| 工具集 | ✅ 28/32 | 与桌面端一致的工具；`schedule_*` 需要桌面的会话控制器，SDK 组合里没有 |
 | 会话内权限切换 | ✅ | 输入框左侧切换 `workspace-write` / `danger-full-access`，写入会话日志；新会话可用默认值 |
 | 执行计划与进度 | ✅ | 渲染 `todo_write` 的清单与完成度（含表头与实时条） |
 | 实时状态条 | ✅ | 当前轮次、正在运行的工具、工具次数、计划进度、已用时 |
@@ -125,6 +126,32 @@ powershell -STA -File .\scripts\tray.ps1   # 托盘菜单
 1. 左侧能看到真实会话列表（按工作目录分组）。
 2. 右上角显示「余额 ¥…」与「原生账户 / 更新于 …」，点开有钱包明细。
 3. 选一个**测试会话**（或点「新建」），发送一句要求写文件的话，观察工具卡片、终态与历史续写。
+
+## 不开桌面客户端能用吗
+
+**能。** 桥不是桌面客户端的遥控器：它用安装包里的同一个运行时自己启动一个
+`dsh --profile sdk` 进程（`bridge.py → cmd → DeepSeek Harness.exe --expose-internals .../cli.js`），
+模型账户、凭据、会话存储都来自同一个 `$DSH_HOME`。桌面窗口关掉、甚至从未启动，桥都照常工作。
+
+工具对照（实测同一次 `request/header` 的模型可见工具列表）：
+
+| 组合 | 工具数 | 说明 |
+|---|---|---|
+| 桌面（web/desktop profile） | 32 | 含 `present`、`schedule_*`、`load_workspace_dependencies` |
+| 桥（sdk profile + 桥的补丁） | **28** | 已补 `ask_user_question`、`present`、`load_workspace_dependencies` |
+| 差集 | 4 | `schedule_create/delete/list/update`：需要 `dsh-schedule` + 桌面会话控制器，SDK 组合不含 |
+
+`load_workspace_dependencies` 需要 `DSH_PRIMARY_RUNTIME`；桥会自动探测
+`<安装目录>\resources\runtime\primary-runtime`，不需要手工配置。
+
+仍然需要桌面客户端的事情（如实）：
+
+- **凭据过期后重新登录**：登录流程属于桌面端；桥只使用已保存的授权，不会替你登录。
+- **桌面 profile 的自定义 patch**（例如自己加的 MCP 服务器、客户端 UI 设置）不会继承到 sdk 组合；
+  这类能力要接进桥，需要写进桥自己的 `--patch`。
+- **桌面端正在打开的会话**被它持有写锁，桥会返回 `409 session_busy`，不会抢。
+
+`docs/api.md` 里的 `capabilities` 只描述桥真实具备的能力；桌面端有而桥没有的，不会写成 true。
 
 ## 配置项
 

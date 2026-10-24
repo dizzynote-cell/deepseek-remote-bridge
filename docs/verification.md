@@ -45,6 +45,7 @@ python tests\run_tests.py
 | `live_check.py --phase resume` | 5/5 | 桥重启后同一会话仍可读、可 `resume`、第二轮完成、历史 1→2 轮 |
 | `live_interactions.py` | 11/11 | `ask_user_question` 到桥、回答回填、模型按所选值写文件；沙箱升级批准到桥、批准后工具真的执行；批准审计事件出现在历史 |
 | `live_attachments.py` | 6/6 | 图片作为 image block 被模型理解（回答 green）、文本文档被模型读取（回答 magic 值）、上传落在桥目录 |
+| `live_tools.py` | 7/7 | 桥运行时暴露 28 个工具；`load_workspace_dependencies` 返回真实 python 路径；`present` 返回 durable 引用；文件确实存在 |
 | `live_permissions.py` | 13/13 | 预设目录、会话内切换并写入 `permission/preset`/`sandbox/mode`、未知预设 400、新建会话即带预设、`todo_write` 计划与完成度、计划卡进入历史 |
 | `live_parallel.py` | 18/18 | 两个会话同时运行且都出现在运行列表中、各自落盘、各自完成；空闲会话的后续输入 `steered:false`；运行中的第二个输入 `steered:true` 且两条都完成 |
 | `live_files.py` | 6/6 | 生成的 `.md` 与 `.csv` 作为返回文件出现、下载 200 且类型正确、白名单外的路径 403、白名单外的目录 403 |

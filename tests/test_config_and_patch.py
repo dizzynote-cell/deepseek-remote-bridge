@@ -113,6 +113,7 @@ class PatchTests(unittest.TestCase):
         self.assertIn("port: 4567", text)
         self.assertIn("token: 'secret-token'", text)
         self.assertIn("@deepseek-ai/dsh-tool-ask-user", text)
+        self.assertIn("@deepseek-ai/dsh-tool-present", text)
         self.assertIn("defaultPreset: 'workspace-write'", text)
 
     def test_patch_omits_preset_when_unset(self):

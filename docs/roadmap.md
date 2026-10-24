@@ -32,7 +32,18 @@
 5. 工作目录切换：`session/working-directory/set` + 页面入口（带白名单校验）。
 
 已完成：`todo/write` 计划清单与完成度、实时状态条（轮次/当前工具/工具次数/用时）、
-会话内权限预设切换（`permission/preset` + `sandbox/mode` 写入 Harness 日志）。
+会话内权限预设切换（`permission/preset` + `sandbox/mode` 写入 Harness 日志）、
+`present` 与 `load_workspace_dependencies`（工具数 26 → 28）。
+
+### 工具集对照（实测）
+
+| | 数量 | 说明 |
+|---|---|---|
+| 桌面 profile | 32 | 含 `present`、`schedule_*`、`load_workspace_dependencies` |
+| 桥（sdk + 补丁） | 28 | 补了 `ask_user_question`、`present`、`load_workspace_dependencies` |
+| 仍缺 | 4 | `schedule_*`：需要 `dsh-schedule` + `sessionController`，SDK 组合没有，无法只靠补丁解决 |
+
+`load_workspace_dependencies` 依赖 `DSH_PRIMARY_RUNTIME`，桥已自动探测；`present` 通过补丁挂载官方插件。
 
 ## 2. 手机控制才暴露的产品缺口
 
