@@ -23,6 +23,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from typing import Any
 
+from . import pricing
 from .attachments import AttachmentError, AttachmentStore, is_image_path, read_file_bounded
 from .config import BridgeConfig
 from .dsh_adapter import AdapterError
@@ -199,7 +200,13 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
                 return
             if path == "/api/balance":
                 force = _first(query, "refresh") in {"1", "true", "yes"}
-                self._json(state.balance.snapshot_for_page(force=force))
+                payload = state.balance.snapshot_for_page(force=force)
+                payload["pricing"] = pricing.payload_for(
+                    state.config.peak_windows,
+                    state.config.peak_days,
+                    state.config.peak_offset_minutes,
+                )
+                self._json(payload)
                 return
             if path == "/api/interactions":
                 self._json(state.interactions.snapshot())

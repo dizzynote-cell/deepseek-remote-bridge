@@ -52,6 +52,7 @@ assert.match(html, /id="provider-toggle"[^>]*aria-haspopup="menu"/);
 assert.match(html, /id="provider-menu"[^>]*role="menu"/);
 assert.match(html, /role="menuitem"[^>]*disabled[^>]*aria-disabled="true"/);
 assert.match(html, /id="provider-sibling"/);
+assert.match(html, /data-balance-phase/, "the balance pill must show a pricing phase badge");
 assert.match(fs.readFileSync(path.join(web, 'app.js'), 'utf8'), /loadSwitchTargets/, 'the page must read bridge-info for the switch');
 assert.match(fs.readFileSync(path.join(web, 'app.js'), 'utf8'), /bridge-info/, 'the switch reads the bridge-info contract');
 assert.match(html, /Codex/);

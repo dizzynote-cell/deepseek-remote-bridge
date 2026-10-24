@@ -3,7 +3,7 @@
  * One currency/wallet per row; the header shows a single sum only when the
  * recharge wallets share one currency. */
 .balance {
-  width: 168px;
+  width: auto;
   min-width: 168px;
   min-height: 45px;
   padding: 7px 10px;
@@ -85,3 +85,13 @@
 .balance-details button:hover { background: var(--panel); }
 body.mobile-ui .balance { width: 132px; min-width: 132px; min-height: 44px; padding: 6px 8px; }
 body.mobile-ui .balance-details { width: min(310px, calc(100vw - 32px)); }
+
+/* Peak / off-peak badge. Blue for the discounted window, amber for peak:
+   never green, so it cannot be confused with a success state. */
+.phase-badge{display:inline-flex;align-items:center;gap:4px;margin-left:6px;white-space:nowrap;flex:0 0 auto;padding:1px 7px;border-radius:999px;font-size:11px;font-weight:600;line-height:1.6;letter-spacing:.02em}
+.phase-badge[hidden]{display:none}
+.phase-badge.off-peak{background:rgba(77,107,254,.18);color:#a9bcff}
+.phase-badge.peak{background:rgba(240,180,90,.16);color:#f0b45a}
+.pricing-row{display:flex;gap:8px;align-items:flex-start;margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.7}
+.pricing-row .phase-badge{margin-left:0;flex:0 0 auto}
+.pricing-note{color:#8f9bb3;font-size:11px}

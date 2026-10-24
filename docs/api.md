@@ -167,6 +167,19 @@ GET <base>/api/local-task/<taskId>
 ## 余额
 
 ```http
+余额响应同时带一个 `pricing` 对象（只描述时段，不含任何金额）：
+
+```json
+{"pricing": {"phase": "peak", "label": "忙时", "weekend": false,
+             "localTime": "2026-10-26 15:00", "localWeekday": "周一", "zone": "UTC+08:00",
+             "windows": "09:00–12:00、14:00–18:00", "days": "工作日",
+             "nextSwitch": "2026-10-26 18:00", "nextSwitchEpoch": 1793008800, "secondsLeft": 10800,
+             "note": "工作日 …", "invalid": ""}}
+```
+
+`phase` 只取 `peak` / `off-peak`；`invalid` 非空表示配置里的时段/星期写坏了、已回退到默认值。
+桥不返回价格表，也不参与计费：金额始终来自 Platform 的原生余额。
+
 GET <base>/api/balance[?refresh=1]
 POST <base>/api/balance/refresh
 ```

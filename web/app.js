@@ -180,12 +180,37 @@ const money = value => {
 const currencySymbol = code => ({ CNY: '¥', USD: '$' })[code] || (code ? `${code} ` : '');
 const formatTime = epoch => epoch ? new Date(epoch * 1000).toLocaleString('zh-CN', { hour12: false }) : '未知';
 
+let pricingState = null;
+
+function remainingText(epoch) {
+  if (!epoch) return '';
+  const seconds = Math.max(0, Math.round(epoch - Date.now() / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  if (hours > 0) return `${hours} 小时 ${minutes} 分`;
+  if (minutes > 0) return `${minutes} 分钟`;
+  return `${seconds} 秒`;
+}
+
+function paintPhase(pricing) {
+  if (!pricing || !pricing.label) return;
+  const badge = els.balance.querySelector('[data-balance-phase]');
+  if (!badge) return;
+  badge.hidden = false;
+  badge.textContent = pricing.label;
+  badge.className = `phase-badge ${pricing.phase}`;
+  const target = pricing.phase === 'peak' ? '闲时' : '忙时';
+  badge.title = `${pricing.localWeekday} ${pricing.localTime}（${pricing.zone}）· ${remainingText(pricing.nextSwitchEpoch)}后转为${target}`;
+}
+
 async function loadBalance(force = false) {
   const primary = els.balance.querySelector('[data-balance-primary]');
   const state = els.balance.querySelector('[data-balance-state]');
   const note = els.balance.querySelector('[data-balance-note]');
   try {
     const d = await (await bridgeFetch(`/api/balance${force ? '?refresh=1' : ''}`)).json();
+    pricingState = d.pricing || pricingState;
+    paintPhase(d.pricing);
     const available = d.available === true && (d.entries || []).length > 0;
     primary.textContent = available ? (d.display?.label || '余额可用') : '余额暂不可用';
     state.textContent = available ? (d.stale ? '缓存' : '原生账户') : ({ auth_required: '未登录', unsupported: '不支持' }[d.status] || '不可用');
@@ -198,6 +223,10 @@ async function loadBalance(force = false) {
       <strong>DeepSeek Harness 账户余额</strong>
       <p class="balance-source">来源：${esc(d.source || 'harness-account')} · 更新时间：${esc(formatTime(d.updatedAt))}${d.stale ? ' · 数据可能过期' : ''}</p>
       ${rows ? `<table class="balance-table"><thead><tr><th>币种</th><th>钱包</th><th>金额</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="balance-empty">没有可显示的余额条目。</p>'}
+      ${d.pricing ? `<div class="pricing-row"><span class="phase-badge ${esc(d.pricing.phase)}">${esc(d.pricing.label)}</span>
+        <span>${esc(d.pricing.localWeekday)} ${esc(d.pricing.localTime)} · ${esc(d.pricing.zone)}<br>
+        ${d.pricing.nextSwitch ? `${esc(remainingText(d.pricing.nextSwitchEpoch))}后转为${d.pricing.phase === 'peak' ? '闲时' : '忙时'}（${esc(d.pricing.nextSwitch)}）` : '暂无切换信息'}<br>
+        <span class="pricing-note">${esc(d.pricing.note || '')}</span></span></div>` : ''}
       <p class="balance-hint">金额为 Platform 返回的十进制字符串；充值钱包与赠送钱包分开显示，不相加。${d.detail?.note ? ' ' + esc(d.detail.note) : ''}</p>
       <button type="button" id="balance-refresh">刷新余额</button>`;
     els.balanceDetails.querySelector('#balance-refresh').onclick = event => { event.stopPropagation(); loadBalance(true); };
@@ -425,6 +454,7 @@ async function boot() {
   setInterval(() => loadThreads(false), 20000);
   setInterval(loadStatus, 5000);
   setInterval(() => loadBalance(false), 60000);
+  setInterval(() => paintPhase(pricingState), 30000);
   setInterval(refreshVisibleThread, 3000);
   clearInterval(activityTimer);
   activityTimer = setInterval(() => {
