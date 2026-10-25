@@ -179,6 +179,9 @@ if ((-not $NoStart) -and (AskYes 'Start the bridge now' 'Y')) {
 if ((-not $NoAutostart) -and (AskYes 'Create the desktop shortcut and start the bridge at Windows sign-in' 'Y')) {
   & (Join-Path $root 'scripts\install-shortcuts.ps1') -Desktop -Startup | Out-Host
 }
+if ((-not $NoAutostart) -and (AskYes 'Register the auto-recovery task (restarts the bridge within 3 minutes if it dies)' 'Y')) {
+  & (Join-Path $root 'scripts\install-watchdog.ps1') -Minutes 3 | Out-Host
+}
 
 Write-Host "`nSetup complete." -ForegroundColor Green
 Write-Host "  Page      : http://127.0.0.1:$Port/"

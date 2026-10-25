@@ -78,9 +78,18 @@ python bridge.py                 # 前台运行，Ctrl+C 停止
 .\scripts\status-bridge.ps1      # PID / 地址 / 健康 / 托盘状态
 .\scripts\stop-bridge.ps1        # 只停 state/bridge.pid 里那个进程
 .\scripts\restart-bridge.ps1
-.\scripts\watchdog.ps1           # 健康检查失败时自动重启
-.\scripts\install-autostart.ps1  # 开机自启（-Remove 取消）
+.\scripts\install-shortcuts.ps1  # 桌面快捷方式 + 登录启动项（-Remove 取消）
+.\scripts\install-watchdog.ps1   # 自动恢复任务：每 3 分钟检查一次（-Remove 取消）
 ```
+
+### 挂了会自动回来
+
+桥是一个普通进程，可能被关掉、被杀掉或崩溃。`install-watchdog.ps1` 注册一个**计划任务**：
+登录时跑一次，之后每 3 分钟跑一次；健康检查失败或进程不在，就把它重新拉起来（并补上托盘）。
+实测：手动停掉桥，任务运行后 5 秒内恢复，页面重新可访问。
+
+- 想主动停桥维护时，先 `install-watchdog.ps1 -Remove`，否则 3 分钟内会被拉起来。
+- 任务只认本仓库 `state/bridge.pid` 记录的进程，不会碰 Codex 桥。
 
 双击 `DeepSeek Remote Bridge.cmd` 会启动桥 + 托盘并打开页面。
 
