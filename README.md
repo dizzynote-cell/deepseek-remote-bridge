@@ -206,7 +206,7 @@ python tests\run_tests.py        # 131 个 Python 用例 + 2 个 Node 页面契�
 
 文档：架构 [`docs/architecture.md`](docs/architecture.md) · 接口 [`docs/api.md`](docs/api.md) ·
 双桥整合 [`docs/integration.md`](docs/integration.md) · 部署与回退 [`docs/deployment.md`](docs/deployment.md) ·
-缺口与路线 [`docs/roadmap.md`](docs/roadmap.md) · 飞书登录引导 [`docs/feishu-setup.md`](docs/feishu-setup.md)
+缺口与路线 [`docs/roadmap.md`](docs/roadmap.md) · 飞书登录引导 [`docs/feishu-setup.md`](docs/feishu-setup.md) · 交接清单 [`docs/handoff.md`](docs/handoff.md)
 
 ## 许可与归属
 
