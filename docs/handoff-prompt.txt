@@ -1,7 +1,6 @@
 请把 DeepSeek Remote Bridge 合并进现有服务器，并实现左上角 LOGO 的双桥切换。
 
-先读交接文档（仓库里也有）：
-D:\Deepseekwork\projects\deepseek-remote-bridge\docs\handoff.md
+先读交接文档（仓库 docs/handoff.md）：
 https://github.com/dizzynote-cell/deepseek-remote-bridge/blob/main/docs/handoff.md
 
 关键约束：
