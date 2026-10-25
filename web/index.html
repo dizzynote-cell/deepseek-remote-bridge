@@ -105,18 +105,39 @@
       </div>
       <section id="activity-strip" class="activity-strip" role="status" aria-live="polite" hidden></section>
       <section id="task-strip" class="task-strip" hidden></section>
-      <form id="composer" class="composer">
-        <label class="permission-pick" title="本会话的工具权限预设">权限<select id="permission-select" aria-label="会话权限预设"></select></label>
-        <div class="model-wrap">
-          <button id="model-chip" class="model-chip" type="button" aria-haspopup="menu" aria-expanded="false" title="选择模型与推理强度">模型</button>
-          <div id="model-menu" class="model-menu" hidden>
-            <p class="model-menu-head">模型</p>
-            <div id="model-options" class="model-options" role="menu"></div>
-            <p class="model-menu-head">推理强度</p>
-            <div id="effort-options" class="model-options" role="menu"></div>
-            <p id="model-note" class="model-note"></p>
+      <section id="control-bar" class="control-bar" aria-label="会话设置">
+        <div class="control-group">
+          <span class="control-label">模型</span>
+          <div class="control-wrap">
+            <button id="model-chip" class="control-chip" type="button" aria-haspopup="menu" aria-expanded="false">模型</button>
+            <div id="model-menu" class="control-menu" hidden>
+              <div id="model-options" class="control-options" role="menu"></div>
+              <p id="model-note" class="control-note"></p>
+            </div>
           </div>
         </div>
+        <div class="control-group">
+          <span class="control-label">强度</span>
+          <div class="control-wrap">
+            <button id="effort-chip" class="control-chip" type="button" aria-haspopup="menu" aria-expanded="false">强度</button>
+            <div id="effort-menu" class="control-menu" hidden>
+              <div id="effort-options" class="control-options" role="menu"></div>
+              <p class="control-note">强度越高越慢，质量优先；关闭则不做推理。</p>
+            </div>
+          </div>
+        </div>
+        <div class="control-group">
+          <span class="control-label">权限</span>
+          <div class="control-wrap">
+            <button id="permission-chip" class="control-chip" type="button" aria-haspopup="menu" aria-expanded="false">权限</button>
+            <div id="permission-menu" class="control-menu" hidden>
+              <div id="permission-options" class="control-options" role="menu"></div>
+              <p id="permission-menu-note" class="control-note"></p>
+            </div>
+          </div>
+        </div>
+      </section>
+      <form id="composer" class="composer">
         <label class="file-button" title="添加图片或轻量文件">＋<input id="files" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md"></label>
         <textarea id="prompt" rows="1" aria-label="输入发送给 DeepSeek Harness 的内容" placeholder="输入内容，或 Ctrl+V 粘贴截图"></textarea>
         <button id="send" type="submit">发送</button>

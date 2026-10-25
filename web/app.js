@@ -15,10 +15,13 @@ const els = {
   providerSiblingNote: document.querySelector('#provider-sibling-note'),
   settings: document.querySelector('#settings'), settingsDialog: document.querySelector('#settings-dialog'),
   closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done'),
-  permissionSelect: document.querySelector('#permission-select'), defaultPermission: document.querySelector('#default-permission'),
+  defaultPermission: document.querySelector('#default-permission'),
   modelChip: document.querySelector('#model-chip'), modelMenu: document.querySelector('#model-menu'),
-  modelOptions: document.querySelector('#model-options'), effortOptions: document.querySelector('#effort-options'),
-  modelNote: document.querySelector('#model-note'),
+  modelOptions: document.querySelector('#model-options'), modelNote: document.querySelector('#model-note'),
+  effortChip: document.querySelector('#effort-chip'), effortMenu: document.querySelector('#effort-menu'),
+  effortOptions: document.querySelector('#effort-options'),
+  permissionChip: document.querySelector('#permission-chip'), permissionMenu: document.querySelector('#permission-menu'),
+  permissionOptions: document.querySelector('#permission-options'), permissionMenuNote: document.querySelector('#permission-menu-note'),
   permissionNote: document.querySelector('#permission-note'), activity: document.querySelector('#activity-strip')
 };
 let threads = [], managedProjects = [], selected = null, threadLoading = false, lastThreadSignature = '';
@@ -47,28 +50,36 @@ function modelLabels() {
 }
 
 function paintModelChip() {
-  if (!els.modelChip) return;
   const labels = modelLabels();
-  els.modelChip.textContent = `${labels.model}${labels.effort ? ' · ' + labels.effort : ''}`;
-  els.modelChip.title = `${labels.model}${labels.effort ? ' · 强度 ' + labels.effort : ''}（点击切换）`;
+  if (els.modelChip) {
+    els.modelChip.textContent = labels.model;
+    els.modelChip.title = `模型：${labels.model}（点击切换）`;
+  }
+  if (els.effortChip) {
+    els.effortChip.textContent = labels.effort || '强度';
+    els.effortChip.title = `推理强度：${labels.effort || '未设置'}（点击切换）`;
+  }
 }
 
 function paintModelMenu() {
-  if (!els.modelOptions || !els.effortOptions) return;
-  els.modelOptions.innerHTML = modelCatalog.models.map(item => `
-    <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.model}" class="model-option ${item.id === modelSelection.model ? 'current' : ''}" data-model="${esc(item.id)}">
-      <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
-    </button>`).join('');
-  els.effortOptions.innerHTML = modelCatalog.efforts.map(item => `
-    <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.effort}" class="model-option ${item.id === modelSelection.effort ? 'current' : ''}" data-effort="${esc(item.id)}">
-      <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
-    </button>`).join('');
-  els.modelOptions.querySelectorAll('[data-model]').forEach(button => {
-    button.onclick = () => applyModel(button.dataset.model, modelSelection.effort);
-  });
-  els.effortOptions.querySelectorAll('[data-effort]').forEach(button => {
-    button.onclick = () => applyModel(modelSelection.model, button.dataset.effort);
-  });
+  if (els.modelOptions) {
+    els.modelOptions.innerHTML = modelCatalog.models.map(item => `
+      <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.model}" class="control-option ${item.id === modelSelection.model ? 'current' : ''}" data-model="${esc(item.id)}">
+        <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
+      </button>`).join('');
+    els.modelOptions.querySelectorAll('[data-model]').forEach(button => {
+      button.onclick = () => applyModel(button.dataset.model, modelSelection.effort);
+    });
+  }
+  if (els.effortOptions) {
+    els.effortOptions.innerHTML = modelCatalog.efforts.map(item => `
+      <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.effort}" class="control-option ${item.id === modelSelection.effort ? 'current' : ''}" data-effort="${esc(item.id)}">
+        <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
+      </button>`).join('');
+    els.effortOptions.querySelectorAll('[data-effort]').forEach(button => {
+      button.onclick = () => applyModel(modelSelection.model, button.dataset.effort);
+    });
+  }
   if (els.modelNote) {
     els.modelNote.textContent = modelCatalog.note || '';
   }
@@ -116,9 +127,21 @@ async function applyModel(model, effort) {
 
 function projectName(cwd) { return window.projectDisplay.name(cwd, managedProjects); }
 
+const PERMISSION_LABELS = {
+  'workspace-write': { name: '工作区写入', note: '只能写工作区与允许的临时目录；越界操作会先请求批准。' },
+  'danger-full-access': { name: '完全访问', note: '不受限的文件访问，不再弹批准。等同于桌面端的“完全权限”。' },
+};
+
 function permissionLabel(value) {
+  if (PERMISSION_LABELS[value]) return PERMISSION_LABELS[value].name;
   const option = permissionCatalog.options.find(item => item.value === value);
   return option ? (option.name || option.value) : (value || '未知');
+}
+
+function permissionNote(value) {
+  if (PERMISSION_LABELS[value]) return PERMISSION_LABELS[value].note;
+  const option = permissionCatalog.options.find(item => item.value === value);
+  return option?.description || '';
 }
 
 function fillPermissionSelect(select, value) {
@@ -130,6 +153,29 @@ function fillPermissionSelect(select, value) {
   if (!select.value && select.options.length) select.selectedIndex = 0;
 }
 
+function paintPermissionMenu() {
+  if (!els.permissionOptions) return;
+  const current = permissionCatalog.current || permissionCatalog.bridgeDefault || '';
+  els.permissionOptions.innerHTML = permissionCatalog.options.map(option => `
+    <button type="button" role="menuitemradio" aria-checked="${option.value === current}" class="control-option ${option.value === current ? 'current' : ''}" data-permission="${esc(option.value)}">
+      <strong>${esc(permissionLabel(option.value))}</strong><small>${esc(permissionNote(option.value))}</small>
+    </button>`).join('');
+  els.permissionOptions.querySelectorAll('[data-permission]').forEach(button => {
+    button.onclick = () => changeSessionPermission(button.dataset.permission);
+  });
+  if (els.permissionMenuNote) {
+    els.permissionMenuNote.textContent = selected
+      ? '只影响本会话；切换会重新打开该会话并写回 Harness 日志。'
+      : '没有选中会话时，改动只作为新会话默认值。';
+  }
+}
+
+function paintPermissionChip() {
+  if (!els.permissionChip) return;
+  const value = permissionCatalog.current || permissionCatalog.bridgeDefault || '';
+  els.permissionChip.textContent = value ? permissionLabel(value) : '权限';
+}
+
 async function loadPermissionCatalog() {
   try {
     const data = await (await bridgeFetch('/api/permissions')).json();
@@ -139,7 +185,8 @@ async function loadPermissionCatalog() {
       bridgeDefault: data.bridgeDefault || data.defaultPreset || ''
     };
   } catch { /* keep the last catalog */ }
-  fillPermissionSelect(els.permissionSelect, currentThread?.bridgePermission || null);
+  paintPermissionChip();
+  paintPermissionMenu();
   fillPermissionSelect(els.defaultPermission, permissionCatalog.bridgeDefault);
   if (els.permissionNote) {
     const active = permissionCatalog.options.find(item => item.value === permissionCatalog.bridgeDefault);
@@ -154,8 +201,11 @@ async function syncThreadPermission(id) {
   try {
     const data = await (await bridgeFetch(`/api/permissions?threadId=${encodeURIComponent(id)}`)).json();
     const value = data.current || data.bridgeDefault || permissionCatalog.bridgeDefault;
-    fillPermissionSelect(els.permissionSelect, value);
-    els.permissionSelect.dataset.thread = id;
+    permissionCatalog.current = data.current || null;
+    permissionCatalog.bridgeDefault = data.bridgeDefault || permissionCatalog.bridgeDefault;
+    paintPermissionChip();
+    paintPermissionMenu();
+    if (els.permissionChip) els.permissionChip.dataset.thread = id;
   } catch { /* leave the select as-is */ }
 }
 function statusLabel(status) {
@@ -532,6 +582,8 @@ async function boot() {
   await window.voiceUI?.boot();
   await loadPermissionCatalog();
   await loadModels();
+  paintPermissionChip();
+  paintPermissionMenu();
   await loadSwitchTargets();
   await loadThreads(false);
   loadStatus();
@@ -552,12 +604,12 @@ async function boot() {
 }
 async function changeSessionPermission(preset) {
   if (!preset) return;
-  const threadId = els.permissionSelect.dataset.thread || selected;
+  const threadId = els.permissionChip.dataset.thread || selected;
   if (!threadId) {
     showTaskNotice('先选择一个会话，或把它设为新会话默认权限', true);
     return;
   }
-  els.permissionSelect.disabled = true;
+  els.permissionChip.disabled = true;
   try {
     const response = await bridgeFetch('/api/permissions', {
       method: 'POST',
@@ -571,7 +623,7 @@ async function changeSessionPermission(preset) {
   } catch (error) {
     showTaskNotice(`权限切换失败：${error.message}`, true);
   } finally {
-    els.permissionSelect.disabled = false;
+    els.permissionChip.disabled = false;
   }
 }
 
@@ -605,24 +657,31 @@ function showTaskNotice(message, error = false) {
   }
 }
 
-els.permissionSelect.onchange = () => changeSessionPermission(els.permissionSelect.value);
+const controlMenus = [
+  { chip: els.modelChip, menu: els.modelMenu, paint: paintModelMenu },
+  { chip: els.effortChip, menu: els.effortMenu, paint: paintModelMenu },
+  { chip: els.permissionChip, menu: els.permissionMenu, paint: paintPermissionMenu },
+].filter(entry => entry.chip && entry.menu);
 
-if (els.modelChip) {
-  els.modelChip.onclick = event => {
-    event.stopPropagation();
-    const open = els.modelMenu.hidden;
-    els.modelMenu.hidden = !open;
-    els.modelChip.setAttribute('aria-expanded', String(open));
-    if (open) paintModelMenu();
-  };
-  els.modelMenu.onclick = event => event.stopPropagation();
-  document.addEventListener('click', () => {
-    if (!els.modelMenu.hidden) {
-      els.modelMenu.hidden = true;
-      els.modelChip.setAttribute('aria-expanded', 'false');
-    }
+function closeControlMenus() {
+  controlMenus.forEach(({ chip, menu }) => {
+    menu.hidden = true;
+    chip.setAttribute('aria-expanded', 'false');
   });
 }
+
+controlMenus.forEach(({ chip, menu, paint }) => {
+  chip.onclick = event => {
+    event.stopPropagation();
+    const open = menu.hidden;
+    closeControlMenus();
+    menu.hidden = !open;
+    chip.setAttribute('aria-expanded', String(open));
+    if (open) paint();
+  };
+  menu.onclick = event => event.stopPropagation();
+});
+document.addEventListener('click', closeControlMenus);
 if (els.defaultPermission) els.defaultPermission.onchange = () => changeDefaultPermission(els.defaultPermission.value);
 
 els.settings.onclick = () => {

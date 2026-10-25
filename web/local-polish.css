@@ -36,13 +36,6 @@ dialog.settings-dialog header button{border:0;background:transparent;color:var(-
 dialog.settings-dialog footer{display:flex;justify-content:flex-end;margin-top:14px}
 dialog.settings-dialog footer button{border:1px solid #3f58c9;border-radius:9px;background:#1a2350;color:#dfe6ff;padding:8px 16px;cursor:pointer}
 body.mobile-ui button.icon-button{width:30px;height:30px;font-size:13px}
-/* Permission picker inside the composer */
-.permission-pick{display:inline-flex;align-items:center;gap:6px;flex:0 0 auto;padding:0 10px;height:44px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--muted);font-size:12px;white-space:nowrap}
-.permission-pick select{border:0;background:transparent;color:var(--text);font:inherit;max-width:150px}
-.permission-pick select:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:6px}
-.permission-pick select:disabled{opacity:.6}
-body.mobile-ui .permission-pick{height:40px;font-size:11px;max-width:46vw}
-body.mobile-ui .permission-pick select{max-width:30vw}
 
 /* Live activity strip: step / current tool / plan progress / elapsed */
 .activity-strip{display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:8px max(18px,calc((100% - 900px)/2));border-top:1px solid var(--line);background:#0f1730;color:#c7d3ff;font-size:12px}
@@ -66,32 +59,34 @@ body.mobile-ui .permission-pick select{max-width:30vw}
 .todo-item.in_progress .todo-mark{color:var(--accent)}
 .todo-item.in_progress{color:#dbe3ff}
 .todo-item p{margin:0}
-/* Phone composer: textarea on its own row, controls under it. */
-body.mobile-ui .composer{flex-wrap:wrap;gap:8px}
-body.mobile-ui .composer textarea{order:1;flex:1 1 100%;min-height:44px}
-body.mobile-ui .permission-pick{order:2;flex:1 1 auto;max-width:none;height:40px}
-body.mobile-ui .file-button{order:2}
-body.mobile-ui .composer #send{order:2}
 /* Brand mark: the supplied whale logo replaces the drawn "D". */
 .logo{overflow:hidden;padding:0;background:transparent;position:relative}
 .logo img{width:100%;height:100%;display:block;object-fit:cover;border-radius:13px}
 button.logo:hover img{filter:brightness(1.08)}
 
-
-/* Model and reasoning-effort picker, kept next to the permission picker. */
-.model-wrap{position:relative;flex:0 0 auto}
-.composer .model-chip{height:44px;max-width:190px;padding:0 12px;border:1px solid var(--line);border-radius:12px;background:var(--panel2);color:var(--text);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.composer .model-chip:hover{border-color:var(--accent)}
-.composer .model-chip[aria-expanded="true"]{border-color:var(--accent);background:#1b2540}
-.model-menu{position:absolute;left:0;bottom:52px;z-index:40;width:280px;padding:12px;border:1px solid var(--line);border-radius:14px;background:#121a2c;box-shadow:0 18px 40px rgba(0,0,0,.45)}
-.model-menu[hidden]{display:none}
-.model-menu-head{margin:0 0 6px;color:var(--muted);font-size:11px;letter-spacing:.04em}
-.model-options{display:grid;gap:6px;margin:0 0 12px}
-.composer .model-option{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;height:auto;padding:8px 10px;border:1px solid var(--line);border-radius:10px;background:#0c1322;color:var(--text);font-weight:400;cursor:pointer}
-.composer .model-option strong{font-size:12px;font-weight:650;color:var(--text)}
-.composer .model-option small{color:var(--muted);font-size:11px;font-weight:400}
-.composer .model-option.current{border-color:var(--accent);background:#17224a}
-.composer .model-option:hover{border-color:var(--accent);background:#121b31}
-.model-note{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
-body.mobile-ui .model-chip{height:40px;max-width:120px;padding:0 10px}
-body.mobile-ui .model-menu{width:min(86vw,300px);bottom:48px}
+/* Settings row above the composer: one row for model, effort and permission. */
+.control-bar{display:flex;align-items:center;gap:22px;flex:0 0 auto;padding:10px max(18px,calc((100% - 900px)/2)) 0;background:transparent}
+.control-group{display:flex;align-items:center;gap:8px;min-width:0}
+.control-label{color:var(--muted);font-size:12px;white-space:nowrap}
+.control-wrap{position:relative}
+.control-chip{display:inline-flex;align-items:center;gap:6px;height:32px;max-width:220px;padding:0 12px;border:1px solid var(--line);border-radius:9px;background:#0e1526;color:var(--text);font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.control-chip::after{content:'▾';font-size:9px;color:var(--muted)}
+.control-chip:hover{border-color:#3c52a0;background:#131d36}
+.control-chip[aria-expanded="true"]{border-color:var(--accent);background:#17224a}
+.control-menu{position:absolute;left:0;bottom:calc(100% + 8px);z-index:40;width:268px;padding:10px;border:1px solid var(--line);border-radius:13px;background:#121a2c;box-shadow:0 18px 40px rgba(0,0,0,.45)}
+.control-menu[hidden]{display:none}
+.control-options{display:grid;gap:6px}
+.control-option{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#0c1322;color:var(--text);cursor:pointer}
+.control-option strong{font-size:12px;font-weight:650;color:var(--text)}
+.control-option small{color:var(--muted);font-size:11px;line-height:1.5}
+.control-option:hover{border-color:#3c52a0;background:#121b31}
+.control-option.current{border-color:var(--accent);background:#17224a}
+.control-note{margin:8px 2px 0;color:var(--muted);font-size:11px;line-height:1.6}
+.control-note:empty{display:none}
+body.mobile-ui .control-bar{gap:10px;padding:8px 10px 0;overflow-x:auto;scrollbar-width:none}
+body.mobile-ui .control-bar::-webkit-scrollbar{display:none}
+body.mobile-ui .control-group{gap:5px;flex:0 0 auto}
+body.mobile-ui .control-label{font-size:11px}
+body.mobile-ui .control-chip{height:30px;max-width:42vw;padding:0 9px;font-size:11px}
+body.mobile-ui .control-menu{width:min(82vw,300px)}
+body.mobile-ui .composer{flex-wrap:nowrap}
