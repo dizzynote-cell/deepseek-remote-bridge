@@ -14,7 +14,7 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="manifest" href="manifest.webmanifest">
   <!-- bridge-boot -->
-  <script src="bridge-client.js?v=1"></script>
+  <script defer src="bridge-client.js?v=20261028-snapshots"></script>
   <link rel="stylesheet" href="styles.css?v=1">
   <link rel="stylesheet" href="mode.css?v=1">
   <link rel="stylesheet" href="scrollbars.css?v=1">
@@ -23,8 +23,8 @@
   <link rel="stylesheet" href="thread-browser.css?v=1">
   <link rel="stylesheet" href="mobile.css?v=1">
   <link rel="stylesheet" href="local-composer.css?v=1">
-  <link rel="stylesheet" href="local-polish.css?v=1">
-  <link rel="stylesheet" href="balance.css?v=1">
+  <link rel="stylesheet" href="local-polish.css?v=20261028-snapshots">
+  <link rel="stylesheet" href="balance.css?v=20261028-scroll-panels">
   <link rel="stylesheet" href="markdown.css?v=1">
   <link rel="stylesheet" href="interactions.css?v=1">
   <link rel="stylesheet" href="provider-menu.css?v=1">
@@ -139,18 +139,26 @@
       </section>
       <form id="composer" class="composer">
         <label class="file-button" title="添加图片或轻量文件">＋<input id="files" type="file" multiple accept=".jpg,.jpeg,.png,.webp,.gif,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.csv,.ppt,.pptx,.txt,.md"></label>
-        <textarea id="prompt" rows="1" aria-label="输入发送给 DeepSeek Harness 的内容" placeholder="输入内容，或 Ctrl+V 粘贴截图"></textarea>
+        <textarea id="prompt" rows="1" aria-label="输入发送给 DeepSeek Harness 的内容"></textarea>
         <button id="send" type="submit">发送</button>
       </form>
       <div id="file-list" class="file-list" hidden></div>
     </section>
   </main>
-  <script src="lib/markdown-it-15.0.3.min.js"></script>
-  <script src="markdown.js?v=1"></script>
-  <script src="project-display.js?v=1"></script>
-  <script src="voice-ui.js?v=1"></script>
-  <script src="app.js?v=1"></script>
-  <script src="local-composer.js?v=1"></script>
-  <script src="interactions.js?v=1"></script>
+  <script defer src="lib/markdown-it-15.0.3.min.js"></script>
+  <script defer src="markdown.js?v=1"></script>
+  <script defer src="project-display.js?v=1"></script>
+  <script defer src="voice-ui.js?v=20261028-snapshots"></script>
+  <link rel="stylesheet" href="message-time.css?v=20261027">
+  <script defer src="message-time.js?v=20261027"></script>
+  <link rel="stylesheet" href="thread-browser-controls.css?v=20261027">
+  <script defer src="thread-browser-controls.js?v=20261027" data-provider="deepseek-harness"></script>
+  <script defer src="startup-scheduler.js?v=20261028"></script>
+  <link rel="stylesheet" href="session-ui.css?v=20261028-account-footer">
+  <script defer src="session-ui.js?v=20261028-device-management"></script>
+  <script defer src="app.js?v=20261028-snapshots"></script>
+  <script defer src="local-composer.js?v=1"></script>
+  <script defer src="interactions.js?v=20261028-snapshots"></script>
+  <script defer src="bridge-switcher.js?v=20261028-snapshots" data-provider="deepseek-harness"></script>
 </body>
 </html>

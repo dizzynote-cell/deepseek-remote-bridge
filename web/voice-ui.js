@@ -199,6 +199,7 @@
   }
 
   async function refreshSettings() {
+    if(window.bridgeLoading&&!window.bridgeLoading.allowed())return window.bridgeLoading.background('voice-settings',refreshSettings);
     try {
       const config = await json('/api/voice/config');
       settings = { ...settings, ...config };

@@ -72,6 +72,30 @@ QUESTIONS = {
 
 
 class InteractionTests(unittest.TestCase):
+    def test_nondefault_route_is_polled_and_answered_at_its_own_adapter(self):
+        import copy
+        first, second = FakeAdapter(), FakeAdapter(copy.deepcopy(APPROVAL))
+        service = InteractionBridge(lambda: {"route-a": first, "route-b": second}, FakeCatalog())
+        service.poll()
+        request = service.snapshot()["requests"][0]
+        self.assertEqual(request["id"], "route-b:approval-1")
+        service.respond({"id": request["id"], "session": service.session_key,
+                         "threadId": "session-demo", "action": "accept"})
+        self.assertEqual(first.calls, [])
+        self.assertEqual(second.calls, [("approval-1", {"outcome": "allowed-once"})])
+        service.poll()
+        self.assertEqual(service.snapshot()["requests"], [])
+
+    def test_wrong_instance_session_or_provider_cannot_answer(self):
+        for patch in [{"session": "old"}, {"threadId": "other"}, {"providerId": "codex"}]:
+            service, adapter = bridge(APPROVAL)
+            service.poll()
+            payload = {"id": "approval-1", "session": service.session_key,
+                       "threadId": "session-demo", "action": "accept", **patch}
+            with self.assertRaises(ValueError):
+                service.respond(payload)
+            self.assertEqual(adapter.calls, [])
+
     def test_approval_is_shaped_for_the_page(self):
         service, _ = bridge(APPROVAL)
         service.poll()
@@ -86,26 +110,26 @@ class InteractionTests(unittest.TestCase):
     def test_accept_maps_to_allowed_once(self):
         service, adapter = bridge(APPROVAL)
         service.poll()
-        service.respond({"id": "approval-1", "action": "accept"})
+        service.respond({"session": service.session_key, "threadId": "session-demo", "id": "approval-1", "action": "accept"})
         self.assertEqual(adapter.calls, [("approval-1", {"outcome": "allowed-once"})])
         self.assertEqual(service.snapshot()["requests"], [])
 
     def test_decline_maps_to_rejected(self):
         service, adapter = bridge(APPROVAL)
         service.poll()
-        service.respond({"id": "approval-1", "action": "decline"})
+        service.respond({"session": service.session_key, "threadId": "session-demo", "id": "approval-1", "action": "decline"})
         self.assertEqual(adapter.calls[0][1], {"outcome": "rejected"})
 
     def test_question_answers_by_option_label(self):
         service, adapter = bridge(QUESTIONS)
         service.poll()
-        service.respond({"id": "questions-1", "action": "answer", "answers": {"q1": "blue"}})
+        service.respond({"session": service.session_key, "threadId": "session-demo", "id": "questions-1", "action": "answer", "answers": {"q1": "blue"}})
         self.assertEqual(adapter.calls[0][1], {"answers": [{"id": "q1", "selected": ["blue"]}]})
 
     def test_free_text_becomes_a_custom_answer(self):
         service, adapter = bridge(QUESTIONS)
         service.poll()
-        service.respond({"id": "questions-1", "action": "answer", "answers": {"q1": "purple"}})
+        service.respond({"session": service.session_key, "threadId": "session-demo", "id": "questions-1", "action": "answer", "answers": {"q1": "purple"}})
         self.assertEqual(
             adapter.calls[0][1],
             {"answers": [{"id": "q1", "selected": [], "custom": "purple"}]},
@@ -115,15 +139,15 @@ class InteractionTests(unittest.TestCase):
         service, adapter = bridge(QUESTIONS)
         service.poll()
         with self.assertRaises(ValueError):
-            service.respond({"id": "questions-1", "action": "answer", "answers": {"q1": "   "}})
+            service.respond({"session": service.session_key, "threadId": "session-demo", "id": "questions-1", "action": "answer", "answers": {"q1": "   "}})
         self.assertEqual(adapter.calls, [])
 
     def test_unknown_or_settled_interaction_is_refused(self):
         service, _ = bridge(APPROVAL)
         service.poll()
-        service.respond({"id": "approval-1", "action": "accept"})
+        service.respond({"session": service.session_key, "threadId": "session-demo", "id": "approval-1", "action": "accept"})
         with self.assertRaises(KeyError):
-            service.respond({"id": "approval-1", "action": "accept"})
+            service.respond({"session": service.session_key, "threadId": "session-demo", "id": "approval-1", "action": "accept"})
 
     def test_revision_moves_only_when_the_set_changes(self):
         service, adapter = bridge(APPROVAL)

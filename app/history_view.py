@@ -201,6 +201,7 @@ class TranscriptProjector:
                 "bridgeImageCount": len(images),
                 "bridgeMessageId": message.get("id") or data.get("id"),
                 "bridgeSource": source_kind,
+                "bridgeTimestamp": event.get("time"),
             }
         )
 
@@ -219,7 +220,7 @@ class TranscriptProjector:
             turn.items.append({"type": "reasoning", "text": reasoning})
         text = _text_of_blocks(content)
         if text.strip():
-            turn.items.append({"type": "agentMessage", "text": text, "phase": "final"})
+            turn.items.append({"type": "agentMessage", "text": text, "phase": "final", "bridgeTimestamp": event.get("time")})
         usage = data.get("usage")
         if isinstance(usage, dict) and usage:
             turn.items = [item for item in turn.items if item.get("type") != "usage"]

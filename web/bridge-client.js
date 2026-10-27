@@ -13,10 +13,17 @@
     if (/^[a-z]+:/i.test(value) || value.startsWith('//')) return value;
     return normalized + value.replace(/^\/+/, '');
   };
-  window.bridgeFetch = (input, init) => {
-    if (typeof input === 'string') return fetch(window.bridgeUrl(input), init);
-    if (input instanceof Request) return fetch(new Request(window.bridgeUrl(input.url), input), init);
-    return fetch(input, init);
+  let authRedirecting = false;
+  window.bridgeFetch = async (input, init) => {
+    const target = typeof input === 'string' ? window.bridgeUrl(input)
+      : input instanceof Request ? new Request(window.bridgeUrl(input.url), input) : input;
+    const response = await fetch(target, init);
+    if (response.status === 401 && !['localhost', '127.0.0.1', '[::1]'].includes(location.hostname) && !authRedirecting) {
+      authRedirecting = true;
+      await window.bridgeSaveDraft?.();
+      location.assign('/signed-out.html');
+    }
+    return response;
   };
 
   // Install as a home-screen app. Service workers need a secure context, so this

@@ -104,7 +104,7 @@ class FakeCatalog:
         }
 
     def known(self, session_id):
-        return None
+        return object() if session_id in {"session-running", "session-idle"} else None
 
     def invalidate(self, session_id=None):
         return None
@@ -168,8 +168,13 @@ class FakePreferences:
 
 
 class FakeState:
+    def session_adapter(self, session_id):
+        return self.catalog.adapter
+
     def __init__(self, config, web_dir):
         self.config = config
+        from app.thread_library import ThreadLibrary
+        self.thread_library = ThreadLibrary(config.data_dir / "thread-library.json")
         self.catalog = FakeCatalog()
         self.tasks = FakeTasks()
         self.balance = FakeBalance()
@@ -242,6 +247,19 @@ class HttpSurfaceTests(unittest.TestCase):
         server = start(FakeState(config, self.web), config)
         self.servers.append(server)
         return config, server.server_address[1]
+
+    def test_library_hide_restore_pin_and_validation(self):
+        _, port = self.build(base_path="/dsh/")
+        url = f"http://127.0.0.1:{port}/dsh/api/thread-library"
+        self.assertEqual(get(url, method="POST", payload={"threadId":"missing", "hidden":True})[0],404)
+        self.assertEqual(get(url, method="POST", payload={"threadId":"session-idle", "hidden":"true"})[0],400)
+        self.assertEqual(get(url, method="POST", payload={"threadId":"session-idle", "hidden":True,"pinned":True,"name":"测试"})[0],200)
+        self.assertTrue(json.loads(get(url)[1])["threads"]["session-idle"]["hidden"])
+        self.assertEqual(get(url, method="POST", payload={"threadId":"session-idle","hidden":False})[0],200)
+        saved=json.loads(get(url)[1])["threads"]["session-idle"]
+        self.assertFalse(saved["hidden"])
+        self.assertTrue(saved["pinned"])
+        self.assertEqual(get(url, method="POST", headers={"Origin":"https://other.example"},payload={"threadId":"session-idle","hidden":True})[0],403)
 
     def test_root_mount_serves_index_with_boot_injection(self):
         _, port = self.build()

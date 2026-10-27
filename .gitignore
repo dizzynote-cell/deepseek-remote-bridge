@@ -55,3 +55,8 @@ BASELINE_FILES.txt
 spike/
 notes/
 TODO.local.md
+
+# Snapshot databases must never ship
+*.db
+*.db-wal
+*.db-shm

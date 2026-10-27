@@ -95,3 +95,13 @@ body.mobile-ui .balance-details { width: min(310px, calc(100vw - 32px)); }
 .pricing-row{display:flex;gap:8px;align-items:flex-start;margin:10px 0 4px;padding-top:10px;border-top:1px solid var(--line);font-size:12px;color:var(--muted);line-height:1.7}
 .pricing-row .phase-badge{margin-left:0;flex:0 0 auto}
 .pricing-note{color:#8f9bb3;font-size:11px}
+/* Keep long account details reachable on small screens without scrolling the chat. */
+.balance-details {
+  box-sizing: border-box;
+  max-height: min(70vh, calc(100vh - 110px));
+  max-height: min(70dvh, calc(100dvh - 110px - env(safe-area-inset-bottom, 0px)));
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-gutter: stable;
+}

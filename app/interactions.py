@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import threading
 import time
+import uuid
 from typing import Any
 
 from .dsh_adapter import AdapterClient, AdapterError
@@ -27,7 +28,10 @@ class InteractionBridge:
         self.lock = threading.RLock()
         self.requests: dict[str, dict[str, Any]] = {}
         self.revision = 0
-        self.session_key = "local"
+        self.session_key = uuid.uuid4().hex
+        self._destinations = {}
+        self._settled = set()
+        self._sending = set()
         self.started_at = int(time.time() * 1000)
         self.available = False
         self.last_error = ""
@@ -56,26 +60,39 @@ class InteractionBridge:
 
     def poll(self) -> None:
         try:
-            payload = self.adapter.interactions()
+            sources = self.adapter
+            sources = sources if isinstance(sources, dict) else {"": sources}
         except AdapterError as error:
             with self.lock:
                 self.available = False
                 self.last_error = str(error)
             return
-        incoming: dict[str, dict[str, Any]] = {}
-        for raw in payload.get("interactions") or []:
-            if not isinstance(raw, dict):
+        incoming, destinations, succeeded, failures = {}, {}, 0, []
+        for instance, adapter in sources.items():
+            try:
+                payload = adapter.interactions()
+                succeeded += 1
+            except AdapterError as error:
+                failures.append(str(error))
                 continue
-            request = self._shape(raw)
-            if request is not None:
-                incoming[request["id"]] = request
+            for raw in payload.get("interactions") or []:
+                if not isinstance(raw, dict):
+                    continue
+                request = self._shape(raw)
+                if request is not None:
+                    native_id = request["id"]
+                    request["id"] = f"{instance}:{native_id}" if instance else native_id
+                    incoming[request["id"]] = request
+                    destinations[request["id"]] = (adapter, native_id)
         with self.lock:
+            incoming = {key: value for key, value in incoming.items() if key not in self._settled}
             changed = set(incoming) != set(self.requests)
             if changed:
                 self.revision += 1
             self.requests = incoming
-            self.available = True
-            self.last_error = ""
+            self._destinations = {key: destinations[key] for key in incoming}
+            self.available = succeeded > 0
+            self.last_error = "" if succeeded else ('; '.join(failures)[:400] or "运行时暂时无法连接")
 
     def _shape(self, raw: dict[str, Any]) -> dict[str, Any] | None:
         interaction_id = str(raw.get("id") or "")
@@ -171,6 +188,13 @@ class InteractionBridge:
         action = str(payload.get("action") or "")
         with self.lock:
             request = self.requests.get(interaction_id)
+            if payload.get("session") != self.session_key:
+                raise ValueError("请求实例已变化，请刷新后重试")
+            if request and payload.get("threadId") != request.get("threadId"):
+                raise ValueError("回答的会话与原请求不一致")
+            if payload.get("providerId", "deepseek-harness") != "deepseek-harness":
+                raise ValueError("回答属于其他后端")
+            destination = self._destinations.get(interaction_id)
         if request is None:
             raise KeyError("该请求已不在等待状态")
         if request["kind"] == "questions":
@@ -190,13 +214,27 @@ class InteractionBridge:
                     shaped.append({"id": question["id"], "selected": [text]})
                 else:
                     shaped.append({"id": question["id"], "selected": [], "custom": text})
-            self.adapter.respond(interaction_id, {"answers": shaped})
+            response = {"answers": shaped}
         else:
             outcome = {"accept": "allowed-once", "decline": "rejected", "cancel": "cancelled"}.get(action)
             if outcome is None:
                 raise ValueError("不支持的批准动作")
-            self.adapter.respond(interaction_id, {"outcome": outcome})
+            response = {"outcome": outcome}
         with self.lock:
+            if interaction_id in self._sending or interaction_id in self._settled:
+                raise KeyError("该请求正在提交或已经处理")
+            if self.requests.get(interaction_id) is not request or destination is None:
+                raise KeyError("该请求已过期，请刷新")
+            self._sending.add(interaction_id)
+        try:
+            adapter, native_id = destination
+            adapter.respond(native_id, response)
+        finally:
+            with self.lock:
+                self._sending.discard(interaction_id)
+        with self.lock:
+            self._settled.add(interaction_id)
             self.requests.pop(interaction_id, None)
+            self._destinations.pop(interaction_id, None)
             self.revision += 1
         return {"status": "answered"}

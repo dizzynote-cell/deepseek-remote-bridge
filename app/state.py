@@ -18,6 +18,7 @@ from .dsh_runtime import RuntimePool, stage_diagnostics
 from .interactions import InteractionBridge
 from .preferences import Preferences
 from .sessions import SessionCatalog
+from .thread_library import ThreadLibrary
 from .tasks import TaskRunner
 from .voice import VoiceService, load_settings
 
@@ -29,7 +30,8 @@ class BridgeState:
         self.config = config
         self.config.ensure_dirs()
         self.pool = RuntimePool(config)
-        self.catalog = SessionCatalog(self.adapter)
+        self.thread_library = ThreadLibrary(config.data_dir / "thread-library.json")
+        self.catalog = SessionCatalog(self.adapter, library=self.thread_library)
         self.balance = BalanceService(self.adapter, config.provider_id)
         self.attachments = AttachmentStore(
             config.uploads_dir,
@@ -48,7 +50,7 @@ class BridgeState:
             config, self.pool, self.catalog, self.returned_files, self._on_task_finished,
             routes_path=config.data_dir / "session-routes.json",
         )
-        self.interactions = InteractionBridge(self.adapter, self.catalog)
+        self.interactions = InteractionBridge(self.interaction_adapters, self.catalog)
         self.preferences = Preferences(config.data_dir / "preferences.json")
         self.voice = VoiceService(
             config.cache_dir / "voice",
@@ -66,6 +68,17 @@ class BridgeState:
     # -- services -------------------------------------------------------
     def adapter(self) -> AdapterClient:
         handle = self.pool.acquire()
+        return AdapterClient(handle.adapter_port, handle.adapter_token)
+
+    def interaction_adapters(self) -> dict[str, AdapterClient]:
+        self.pool.acquire()
+        with self.pool.lock:
+            handles = [handle for handle in self.pool.handles.values() if handle.alive]
+        return {handle.instance_id: AdapterClient(handle.adapter_port, handle.adapter_token, timeout=5.0)
+                for handle in handles}
+
+    def session_adapter(self, session_id: str) -> AdapterClient:
+        handle = self.pool.acquire(self.tasks.route_for(session_id))
         return AdapterClient(handle.adapter_port, handle.adapter_token)
 
     def _on_task_finished(self, task) -> None:
@@ -113,9 +126,13 @@ class BridgeState:
             adapter_ok = False
             adapter_error = str(error)
         return {
+            "relay": {"enabled": bool(getattr(self.config, "relay_url", "")),
+                      "connected": bool(getattr(getattr(self, "relay", None), "connected", False)),
+                      "lastError": getattr(getattr(self, "relay", None), "last_error", "")},
             "ok": bool(overview["routes"]) and adapter_ok,
             "version": self.config.version,
             "uptimeSeconds": round(time.time() - self.started_at, 1),
+            "snapshotSync": {"enabled": bool(getattr(self,"snapshot_sync",None)), "lastSuccess":getattr(getattr(self,"snapshot_sync",None),"last_success",0), "lastError":getattr(getattr(self,"snapshot_sync",None),"last_error","")},
             "runtime": overview,
             "adapter": {"ok": adapter_ok, "error": adapter_error},
             "lastSessionsError": self.catalog.last_error,

@@ -333,6 +333,38 @@ export function apply(ctx, config) {
     };
   }
 
+  // Cache only activity metadata, not messages. Four bounded readers use the
+  // SDK's read-only event metadata API; opening a session is never required.
+  const activityCache = new Map();
+  async function activityTimes(service, records) {
+    let cursor = 0;
+    const now = Date.now(), result = new Map();
+    const meaningful = new Set(['user/message','assistant/message','turn/start','turn/end','tool/call','tool/result']);
+    async function worker() {
+      while (cursor < records.length) {
+        const record = records[cursor++], id = String(record.header.id);
+        const cached = activityCache.get(id);
+        if (cached && now - cached.checked < (record.live ? 5000 : 60000)) {
+          result.set(id, cached.time); continue;
+        }
+        let time = Number(record.header.createdAt || 0);
+        try {
+          const events = await service.listEvents(id);
+          for (const event of events) {
+            if (meaningful.has(event.type) && Number.isFinite(Number(event.time)))
+              time = Math.max(time, Number(event.time));
+          }
+          activityCache.set(id, {time, checked: now});
+        } catch { time = cached?.time || time; }
+        result.set(id, time);
+      }
+    }
+    await Promise.all(Array.from({length: Math.min(4, records.length)}, worker));
+    const known = new Set(records.map(r => String(r.header.id)));
+    for (const id of activityCache.keys()) if (!known.has(id)) activityCache.delete(id);
+    return result;
+  }
+
   async function readSessions(query) {
     const query_service = ctx.get("sessionQuery");
     if (query_service === undefined) throw new Error("the composed runtime has no session query service");
@@ -340,6 +372,8 @@ export function apply(ctx, config) {
     const includeChildren = query.get("children") === "1";
     const records = await query_service.listSessions();
     const filtered = records.filter((record) => includeChildren || record.header?.parentSession === undefined);
+    const activity = await activityTimes(query_service, filtered);
+    filtered.sort((a,b) => (activity.get(String(b.header.id)) || 0) - (activity.get(String(a.header.id)) || 0) || String(a.header.id).localeCompare(String(b.header.id)));
     const trimmed = filtered.slice(0, limit);
     const ids = trimmed.map((record) => String(record.header.id));
     let titles = new Map();
@@ -365,6 +399,7 @@ export function apply(ctx, config) {
         return {
           id,
           createdAt: Number(header.createdAt ?? 0),
+          updatedAt: activity.get(id) || Number(header.createdAt ?? 0),
           cwd: header.cwd === undefined ? null : String(header.cwd),
           parentSessionId: header.parentSession === undefined ? null : String(header.parentSession),
           live: record.live === true,

@@ -65,7 +65,8 @@ body.mobile-ui button.icon-button{width:30px;height:30px;font-size:13px}
 button.logo:hover img{filter:brightness(1.08)}
 
 /* Settings row above the composer: one row for model, effort and permission. */
-.control-bar{display:flex;align-items:center;gap:22px;flex:0 0 auto;padding:10px max(18px,calc((100% - 900px)/2)) 0;background:transparent}
+.control-bar{display:flex;align-items:center;gap:22px;flex:0 0 auto;padding:10px max(18px,calc((100% - 900px)/2));border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:#111a2b;box-shadow:inset 0 1px 0 rgba(255,255,255,.025)}
+.control-bar + .composer{border-top:0}
 .control-group{display:flex;align-items:center;gap:8px;min-width:0}
 .control-label{color:var(--muted);font-size:12px;white-space:nowrap}
 .control-wrap{position:relative}
@@ -76,6 +77,7 @@ button.logo:hover img{filter:brightness(1.08)}
 .control-menu{position:absolute;left:0;bottom:calc(100% + 8px);z-index:40;width:268px;padding:10px;border:1px solid var(--line);border-radius:13px;background:#121a2c;box-shadow:0 18px 40px rgba(0,0,0,.45)}
 .control-menu[hidden]{display:none}
 .control-options{display:grid;gap:6px}
+.control-menu{overscroll-behavior:contain;touch-action:pan-y}
 .control-option{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;padding:8px 10px;border:1px solid var(--line);border-radius:9px;background:#0c1322;color:var(--text);cursor:pointer}
 .control-option strong{font-size:12px;font-weight:650;color:var(--text)}
 .control-option small{color:var(--muted);font-size:11px;line-height:1.5}
@@ -83,10 +85,13 @@ button.logo:hover img{filter:brightness(1.08)}
 .control-option.current{border-color:var(--accent);background:#17224a}
 .control-note{margin:8px 2px 0;color:var(--muted);font-size:11px;line-height:1.6}
 .control-note:empty{display:none}
-body.mobile-ui .control-bar{gap:10px;padding:8px 10px 0;overflow-x:auto;scrollbar-width:none}
+body.mobile-ui .control-bar{gap:10px;padding:8px 10px;overflow-x:auto;scrollbar-width:none}
 body.mobile-ui .control-bar::-webkit-scrollbar{display:none}
 body.mobile-ui .control-group{gap:5px;flex:0 0 auto}
 body.mobile-ui .control-label{font-size:11px}
-body.mobile-ui .control-chip{height:30px;max-width:42vw;padding:0 9px;font-size:11px}
+body.mobile-ui .control-chip{height:44px;max-width:42vw;padding:0 9px;font-size:11px}
+body.mobile-ui .control-option{min-height:44px;justify-content:center}
 body.mobile-ui .control-menu{width:min(82vw,300px)}
 body.mobile-ui .composer{flex-wrap:nowrap}
+
+.snapshot-note{padding:7px 14px;font-size:11px;line-height:1.5;color:var(--muted);border-bottom:1px solid var(--line);flex-shrink:0}.snapshot-note[hidden]{display:none}

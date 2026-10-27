@@ -18,6 +18,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $script = Join-Path $root 'scripts\watchdog-once.ps1'
+$hiddenLauncher = Join-Path $root 'scripts\watchdog-hidden.vbs'
 $taskName = 'DeepSeek Remote Bridge Watchdog'
 
 if ($Remove) {
@@ -27,10 +28,11 @@ if ($Remove) {
 }
 
 if (-not (Test-Path $script)) { throw "Missing $script" }
+if (-not (Test-Path $hiddenLauncher)) { throw "Missing $hiddenLauncher" }
 if ($Minutes -lt 1 -or $Minutes -gt 60) { throw 'Minutes must be between 1 and 60.' }
 
-$action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\WindowsPowerShell\v1.0\powershell.exe" `
-  -Argument "-NoProfile -ExecutionPolicy Bypass -WindowStyle Hidden -File `"$script`"" `
+$action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\wscript.exe" `
+  -Argument "//B //Nologo `"$hiddenLauncher`"" `
   -WorkingDirectory $root
 $triggers = @()
 $triggers += New-ScheduledTaskTrigger -AtLogOn

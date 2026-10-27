@@ -66,6 +66,21 @@ def main(argv: list[str] | None = None) -> int:
 
     threading.Thread(target=warm, name="warm-runtime", daemon=True).start()
     server = serve(config, state)
+    relay = None
+    snapshots = None
+    if config.relay_url and not args.check:
+        from .relay_client import RelayClient
+        try:
+            token = config.relay_token_file.read_text(encoding="utf-8").strip() if config.relay_token_file else ""
+            relay = RelayClient(config.relay_url, token, f"http://127.0.0.1:{config.port}", config.normalized_base_path)
+            relay.start()
+            state.relay = relay
+            from .snapshot_sync import SnapshotSync
+            snapshots = SnapshotSync(relay,state,f"http://127.0.0.1:{config.port}",config.normalized_base_path)
+            snapshots.start()
+            state.snapshot_sync = snapshots
+        except Exception as error:
+            print(f"  outbound relay not started: {type(error).__name__}", flush=True)
     pid_file = config.home / "bridge.pid"
     _write_pid(pid_file)
 
@@ -95,6 +110,10 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         pass
     print("stopping…", flush=True)
+    if snapshots is not None:
+        snapshots.shutdown()
+    if relay is not None:
+        relay.shutdown()
     server.shutdown()
     state.shutdown()
     _clear_pid(pid_file)

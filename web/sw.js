@@ -3,7 +3,8 @@
  * Only static assets are cached; every /api/ request and every HTML navigation
  * always goes to the network so the page never shows a stale bridge state.
  */
-const CACHE = 'dsb-shell-v1';
+const CACHE_PREFIX = 'dsb-shell:' + self.registration.scope + ':';
+const CACHE = CACHE_PREFIX + 'v4';
 const SHELL = [
   'styles.css',
   'mode.css',
@@ -20,10 +21,18 @@ const SHELL = [
   'provider-menu.css',
   'voice.css',
   'bridge-client.js',
+  'bridge-switcher.js',
   'markdown.js',
   'project-display.js',
   'voice-ui.js',
   'app.js',
+  'message-time.js',
+  'message-time.css',
+  'thread-browser-controls.js',
+  'thread-browser-controls.css',
+  'startup-scheduler.js',
+  'session-ui.js',
+  'session-ui.css',
   'local-composer.js',
   'interactions.js',
   'lib/markdown-it-15.0.3.min.js',
@@ -41,7 +50,7 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))
+      .then(keys => Promise.all(keys.filter(key => key.startsWith(CACHE_PREFIX) && key !== CACHE).map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
@@ -51,13 +60,14 @@ self.addEventListener('fetch', event => {
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
+  if (!url.href.startsWith(self.registration.scope)) return;
   if (url.pathname.includes('/api/')) return;
   if (request.mode === 'navigate') return;
   // Stale-while-revalidate: the cached copy answers immediately, and the fresh
   // response updates the cache for the next load. Without this, an installed app
   // would keep old CSS/JS until the cache name changed by hand.
   event.respondWith(
-    caches.match(request).then(hit => {
+    caches.open(CACHE).then(cache => cache.match(request)).then(hit => {
       const refresh = fetch(request).then(response => {
         if (response.ok && response.type === 'basic') {
           const copy = response.clone();

@@ -79,6 +79,24 @@ function Get-RunningTray {
   return $null
 }
 
+function Start-BridgeDetached {
+  param([string]$CommandLine, [string]$WorkingDirectory)
+  # Hide at creation time. -WindowStyle Hidden runs too late to prevent a
+  # console flash, and an unhidden cmd parent also owns the Python console.
+  $startup = New-CimInstance -ClassName Win32_ProcessStartup -ClientOnly -Property @{
+    ShowWindow = [uint16]0
+  }
+  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
+    CommandLine = $CommandLine
+    CurrentDirectory = $WorkingDirectory
+    ProcessStartupInformation = $startup
+  }
+  if (-not $created -or $created.ReturnValue -ne 0 -or -not $created.ProcessId) {
+    throw 'Unable to create the bridge background process.'
+  }
+  return $created
+}
+
 function Start-Tray {
   param([string]$Root, [switch]$Quiet)
   $existing = Get-RunningTray $Root
@@ -92,16 +110,14 @@ function Start-Tray {
   # inherited console handles behind.
   $hiddenFlag = if ($Quiet) { ' -Hidden' } else { '' }
   $commandLine = 'powershell.exe -NoProfile -STA -ExecutionPolicy Bypass -WindowStyle Hidden -File "{0}"{1}' -f $tray, $hiddenFlag
-  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-    CommandLine = $commandLine
-    CurrentDirectory = $Root
-  }
+  $created = Start-BridgeDetached -CommandLine $commandLine -WorkingDirectory $Root
   if (-not $created -or -not $created.ProcessId) { throw '无法启动托盘进程。' }
-  Set-Content -Path (Get-TrayPidFile $Root) -Value $created.ProcessId -Encoding ascii
+  # The mutex-owning child writes its own PID. A losing concurrent launcher
+  # must never overwrite that file with a child that exits without an icon.
   Start-Sleep -Milliseconds 800
-  $process = Test-TrayProcess -ProcessId ([int]$created.ProcessId) -Root $Root
+  $process = Get-RunningTray $Root
   if ($process) {
-    Write-Host "托盘已启动（PID $($created.ProcessId)）。"
+    Write-Host "托盘已启动（PID $($process.ProcessId)）。"
   } else {
     Write-Host "托盘进程启动后立即退出；查看 $Root\state\logs\tray.log 或直接运行 scripts\tray.ps1 看报错。"
   }
@@ -200,10 +216,7 @@ function Start-Bridge {
   # Detach completely: a redirected Start-Process keeps the launcher's handles
   # open and the script never returns. The bridge writes its own pid file.
   $commandLine = 'cmd.exe /c ""{0}" -u "{1}" >> "{2}" 2>&1"' -f $python.Source, (Join-Path $Root 'bridge.py'), $outLog
-  $created = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{
-    CommandLine = $commandLine
-    CurrentDirectory = $Root
-  }
+  $created = Start-BridgeDetached -CommandLine $commandLine -WorkingDirectory $Root
   if (-not $created -or -not $created.ProcessId) { throw '无法启动桥进程。' }
   if (Wait-BridgeHealth -Root $Root -Seconds 90) {
     $running = Get-RunningBridge $Root

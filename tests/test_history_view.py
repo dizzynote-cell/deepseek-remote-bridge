@@ -122,3 +122,15 @@ class TranscriptProjectionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MessageTimestampTests(unittest.TestCase):
+    def test_individual_event_times_survive_projection(self):
+        events = [
+            {'type':'turn/start','time':1700000000000,'data':{'turn':1}},
+            {'type':'user/message','time':1700000001000,'data':{'turn':1,'message':{'content':[{'type':'text','text':'hello'}]}}},
+            {'type':'assistant/message','time':1700000002000,'data':{'turn':1,'message':{'content':[{'type':'text','text':'world'}]}}},
+        ]
+        turn = project_session({'id':'demo'},events)['turns'][0]
+        self.assertEqual(turn['items'][0]['bridgeTimestamp'],1700000001000)
+        self.assertEqual(turn['items'][1]['bridgeTimestamp'],1700000002000)

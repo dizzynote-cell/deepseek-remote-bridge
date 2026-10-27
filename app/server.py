@@ -76,7 +76,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
     def _error(self, status: int, message: str, code: str = "error") -> None:
         self._json({"error": message, "code": code}, status=status)
 
-    def _read_json(self, limit: int = 32 * 1024 * 1024) -> dict[str, Any]:
+    def _read_json(self, limit: int | None = None) -> dict[str, Any]:
+        if limit is None:
+            limit = self.config.attachments_max_batch_bytes * 4 // 3 + 1024 * 1024
         try:
             length = int(self.headers.get("content-length") or "0")
         except ValueError:
@@ -200,6 +202,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if path == "/api/auth/config":
                 self._json(state.site_config())
                 return
+            if path == "/api/thread-library":
+                self._json({"threads": state.thread_library.snapshot()})
+                return
             if path == "/api/threads":
                 self._api_threads(query)
                 return
@@ -255,6 +260,24 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return
 
         if method == "POST":
+            if path == "/api/thread-library":
+                payload = self._read_json(limit=4096)
+                session_id = payload.get("threadId")
+                if not isinstance(session_id, str) or not session_id or len(session_id) > 200:
+                    self._error(400, "缺少有效的会话 ID", "invalid_session")
+                    return
+                existing = state.thread_library.snapshot()
+                if session_id not in existing and state.catalog.known(session_id) is None:
+                    self._error(404, "会话不存在", "session_not_found")
+                    return
+                patch = {key: payload[key] for key in ("hidden", "pinned", "name") if key in payload}
+                try:
+                    item = state.thread_library.update(session_id, patch)
+                except ValueError as error:
+                    self._error(400, str(error), "invalid_preference")
+                    return
+                self._json({"ok": True, "thread": item})
+                return
             if path == "/api/local-tasks":
                 self._api_submit()
                 return
@@ -314,7 +337,7 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             self._error(400, "缺少会话 ID", "missing_session")
             return
         try:
-            turn_limit = max(1, min(10_000, int(_first(query, "turnLimit") or "6")))
+            turn_limit = 0 if _first(query,"turnLimit")=="all" else max(1, min(10_000, int(_first(query, "turnLimit") or "6")))
         except ValueError:
             turn_limit = 6
         try:
@@ -404,7 +427,8 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
         state = self.state
         session_id = _first(query, "threadId") or None
         try:
-            payload = state.catalog.adapter.permissions(session_id)
+            adapter = state.session_adapter(session_id) if session_id else state.catalog.adapter
+            payload = adapter.permissions(session_id)
         except AdapterError as error:
             self._error(502, f"读取权限预设失败：{error}", "adapter_error")
             return
@@ -446,7 +470,7 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             return
         try:
             state.tasks.ensure_open(session_id)
-            payload = state.catalog.adapter.set_permission(session_id, preset)
+            payload = state.session_adapter(session_id).set_permission(session_id, preset)
         except TaskRejected as error:
             self._error(error.http_status, str(error), error.code)
             return

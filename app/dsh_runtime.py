@@ -19,6 +19,7 @@ import re
 import socket
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -60,6 +61,7 @@ class RuntimeHandle:
 
     def __init__(self, key: RouteKey, process: RuntimeProcess, adapter_port: int, adapter_token: str):
         self.key = key
+        self.instance_id = uuid.uuid4().hex
         self.process = process
         self.adapter_port = adapter_port
         self.adapter_token = adapter_token

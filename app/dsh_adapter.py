@@ -97,7 +97,7 @@ class AdapterClient:
     # -- interactions ---------------------------------------------------
     def interactions(self, session_id: str | None = None) -> dict[str, Any]:
         query = "" if session_id is None else "?" + urllib.parse.urlencode({"sessionId": session_id})
-        return self._request("GET", f"/interactions{query}", timeout=15.0)
+        return self._request("GET", f"/interactions{query}", timeout=min(5.0, self.timeout))
 
     def respond(self, interaction_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         quoted = urllib.parse.quote(interaction_id, safe="")

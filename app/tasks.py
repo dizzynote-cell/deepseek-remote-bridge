@@ -33,6 +33,7 @@ STATUS_MESSAGE = {
     "failed": "任务执行失败",
     "interrupted": "本轮已中断",
     "cancelled": "任务已取消",
+    "unknown": "运行已结束，但结果暂未确认，请查看历史后再决定是否继续",
 }
 
 BUSY_PATTERNS = (
@@ -245,7 +246,7 @@ class TaskRunner:
 
     def ensure_open(self, session_id: str) -> None:
         """Make a session live in our runtime so its settings can be changed."""
-        handle = self.pool.acquire()
+        handle = self._handle_for(session_id)
         try:
             self._ensure_open(handle, session_id)
         except RpcError as error:
@@ -259,7 +260,22 @@ class TaskRunner:
 
     def status(self, task_id: str) -> LocalTask | None:
         with self.lock:
-            return self.tasks.get(task_id)
+            task = self.tasks.get(task_id)
+            check = bool(task and task.status == 'unknown' and time.monotonic() >= task.detail.get('checkAfter', 0))
+            if check:
+                task.detail['checkAfter'] = time.monotonic() + 10
+        if check:
+            try:
+                payload = self.catalog.adapter.session(task.session_id)
+                thread = project_session(payload.get('header') or {}, payload.get('events') or [])
+                target = _turn_for_message(thread, task.message_id) if task.message_id else None
+                if target and target.get('status') in TASK_TERMINAL:
+                    state, turn_id = self._terminal_state(thread, task.message_id, task.cwd)
+                    task.turn_id = turn_id
+                    self._finish(task, state)
+            except Exception:
+                pass
+        return task
 
     def active_task_for(self, session_id: str) -> LocalTask | None:
         with self.lock:
@@ -363,11 +379,15 @@ class TaskRunner:
         except RpcError as error:
             self._finish(task, "failed", str(error))
             return
-        try:
-            payload = self.catalog.adapter.session(task.session_id)
-        except Exception as error:  # noqa: BLE001 - keep the task honest about uncertainty
-            self._finish(task, "completed", f"运行结束，但读取最终状态失败：{error}")
-            return
+        for attempt in range(3):
+            try:
+                payload = self.catalog.adapter.session(task.session_id)
+                break
+            except Exception as error:
+                if attempt == 2:
+                    self._finish(task, "unknown", "运行结束，但读取最终状态失败，请刷新历史确认结果")
+                    return
+                time.sleep(0.5 * (attempt + 1))
         thread = project_session(payload.get("header") or {}, payload.get("events") or [])
         status, turn_id = self._terminal_state(thread, task.message_id, task.cwd)
         task.turn_id = turn_id

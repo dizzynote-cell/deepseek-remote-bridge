@@ -15,6 +15,20 @@ Add-Type -AssemblyName System.Drawing
 . (Join-Path $PSScriptRoot 'bridge-common.ps1')
 
 $root = Get-BridgeRoot
+# A PID-file check alone races when sign-in and the watchdog start together.
+# Windows owns this lock for the complete tray lifetime, including direct starts.
+$trayHash = [System.Security.Cryptography.SHA256]::Create()
+try {
+  $trayKey = [BitConverter]::ToString($trayHash.ComputeHash([Text.Encoding]::UTF8.GetBytes($root.ToLowerInvariant()))).Replace('-', '')
+} finally { $trayHash.Dispose() }
+$trayMutex = New-Object System.Threading.Mutex($false, ('Local\DeepSeekRemoteBridge.Tray.' + $trayKey))
+$ownsTrayMutex = $false
+try { $ownsTrayMutex = $trayMutex.WaitOne(0) }
+catch [System.Threading.AbandonedMutexException] { $ownsTrayMutex = $true }
+if (-not $ownsTrayMutex) { $trayMutex.Dispose(); return }
+
+try {
+Set-Content -LiteralPath (Get-TrayPidFile $root) -Value $PID -Encoding ascii
 $url = Get-BridgeUrl $root
 $logDir = Join-Path (Get-BridgeState $root) 'logs'
 if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir -Force | Out-Null }
@@ -160,12 +174,22 @@ Write-TrayLog "menu ready; entering message loop"
 [System.Windows.Forms.Application]::Run()
 Write-TrayLog "message loop ended"
 
-$timer.Stop()
-$timer.Dispose()
-$notify.Visible = $false
-$notify.Dispose()
-$assets.Icon.Dispose()
-if ($assets.Bitmap) { $assets.Bitmap.Dispose() }
-if ($assets.Font) { $assets.Font.Dispose() }
-if ($assets.Brush) { $assets.Brush.Dispose() }
-if ($assets.Path) { $assets.Path.Dispose() }
+} finally {
+  try {
+  # Dispose the icon even when initialization or the message loop fails.
+  if ($timer) { $timer.Stop(); $timer.Dispose() }
+  if ($notify) { $notify.Visible = $false; $notify.Dispose() }
+  if ($assets) {
+    foreach ($asset in @($assets.Icon, $assets.Bitmap, $assets.Font, $assets.Brush, $assets.Path)) {
+      if ($asset) { $asset.Dispose() }
+    }
+  }
+  $trayPidPath = Get-TrayPidFile $root
+  if ((Get-Content -LiteralPath $trayPidPath -ErrorAction SilentlyContinue | Select-Object -First 1) -eq [string]$PID) {
+    Remove-Item -LiteralPath $trayPidPath -Force -ErrorAction SilentlyContinue
+  }
+  } finally {
+    if ($ownsTrayMutex) { $trayMutex.ReleaseMutex() }
+    $trayMutex.Dispose()
+  }
+}

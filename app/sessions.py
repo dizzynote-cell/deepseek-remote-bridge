@@ -40,7 +40,8 @@ class ThreadCacheEntry:
 class SessionCatalog:
     """List, read, and cache DSH sessions without making them live."""
 
-    def __init__(self, adapter_factory, cache_ttl: float = 2.5):
+    def __init__(self, adapter_factory, cache_ttl: float = 2.5, library=None):
+        self.library = library
         self._adapter_factory = adapter_factory
         self._cache_ttl = cache_ttl
         self.lock = threading.RLock()
@@ -78,7 +79,7 @@ class SessionCatalog:
                 id=session_id,
                 cwd=row.get("cwd"),
                 created_at=created,
-                updated_at=created,
+                updated_at=max(created, int(row.get("updatedAt") or 0)),
                 title=title if isinstance(title, str) else None,
                 live=bool(row.get("live")),
                 agent_preset=row.get("agentPreset"),
@@ -93,14 +94,15 @@ class SessionCatalog:
                     record.updated_at = max(record.updated_at, int(entry.thread["bridgeUpdatedAt"]))
         return dict(records)
 
-    def rows(self, project_filter: str | None = None, limit: int = 100, offset: int = 0) -> list[dict[str, Any]]:
+    def rows(self, project_filter: str | None = None, limit: int = 100, offset: int = 0, include_hidden: bool = False) -> list[dict[str, Any]]:
         records = self.refresh()
         with self.lock:
             for session_id, entry in self.threads.items():
                 record = records.get(session_id)
                 if record is not None:
                     record.updated_at = max(record.updated_at, int(entry.thread.get("bridgeUpdatedAt") or 0))
-        ordered = sorted(records.values(), key=lambda record: (record.updated_at, record.created_at), reverse=True)
+        metadata = self.library.snapshot() if self.library else {}
+        ordered = sorted((record for record in records.values() if include_hidden or not metadata.get(record.id, {}).get("hidden")), key=lambda record: (-int(bool(metadata.get(record.id, {}).get("pinned"))), -record.updated_at, -record.created_at, record.id))
         if project_filter:
             ordered = [record for record in ordered if (record.cwd or "") == project_filter]
         window = ordered[offset : offset + limit]
@@ -113,6 +115,7 @@ class SessionCatalog:
                     "name": name,
                     "status": "当前已加载" if record.live else "空闲",
                     "cwd": record.cwd,
+                    "pinned": bool(metadata.get(record.id, {}).get("pinned")),
                     "bridgeCreatedAt": record.created_at,
                     "bridgeUpdatedAt": record.updated_at,
                     "bridgeLive": record.live,
@@ -152,7 +155,7 @@ class SessionCatalog:
             thread["name"] = record.title or _short_cwd_name(record.cwd)
         last_time = 0
         for event in reversed(events):
-            if isinstance(event, dict) and event.get("time"):
+            if isinstance(event, dict) and event.get("time") and event.get("type") in {"user/message", "assistant/message", "turn/start", "turn/end", "tool/call", "tool/result"}:
                 last_time = int(event["time"])
                 break
         thread["bridgeUpdatedAt"] = last_time or int(thread.get("createdAt") or 0)

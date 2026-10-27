@@ -1,5 +1,38 @@
 # 更新日志
 
+## Unreleased - account panel polish
+
+- Rename the footer entry and dialog to 登录设备管理. Keep the entry last after account or settings refreshes; constrain long panels to viewport height with touch scrolling.
+
+## Unreleased - DSH cloud snapshots
+
+- Serve DSH assets and read-only snapshots on the server, with independent outbound metadata/history sync and explicit stale/offline states.
+- Share device session management and prioritized startup; retain the existing non-replaying live command relay.
+
+## Unreleased - startup performance
+
+- Wait for explicit conversation selection on entry and reload. Start list and account data independently of optional settings.
+
+## Unreleased — 2026-10-27
+
+- Default to pinned conversations followed by recorded recent activity across projects; retain the project view and show list activity times.
+- Add reversible bridge-only hide, restore and pin controls; rank session event activity before pagination with cached, bounded metadata reads.
+
+
+- Show recorded date and time beside user and assistant messages, including follow-up inputs. Missing timestamps stay explicitly unknown; browser-local formatting works on mobile.
+
+## 1.8.1 — 2026-10-25
+
+- 修复手机端模型、推理强度和权限菜单被横向滚动栏裁剪的问题；菜单按可视区域定位、增大触摸目标，并在后台轮询未改变选项时保留按钮，避免点击中途失效。
+- 托盘使用每个安装目录的单实例互斥锁，避免登录启动与保活任务并发创建两个图标；PID 文件只由实际持有托盘的进程写入。
+- Windows 保活任务通过隐藏启动器运行，桥及托盘进程在创建时隐藏控制台，避免周期性弹出 PowerShell/CMD 窗口。
+- 可选 HTTPS 主动出站转发客户端，由受认证的服务器入口接入 `/dsh/`；不开放主机入站端口，不上传 Harness 身份或模型密钥。
+- LOGO 菜单支持 Codex / DeepSeek Harness 双向切换、离线提示和恢复上次使用的后端；按后端和会话独立保存文字与待发附件。
+- 批准与提问覆盖全部模型运行时，应答校验运行时实例、后端和会话；会话权限操作沿用该会话自己的运行时。
+- PWA 只访问和清理本应用挂载范围的缓存；无法读取最终任务状态时标记待确认，不误报完成。
+- JSON 请求上限考虑附件 base64 膨胀，转发超时提示先核对历史，不自动重发输入。
+- 公网登录过期时先保存草稿，再进入现有服务器登录流程，避免持续轮询未授权接口。
+
 ## 1.8.0 — 2026-10-25
 
 输入区改成两行：上面是模型/强度/权限，下面是输入框。

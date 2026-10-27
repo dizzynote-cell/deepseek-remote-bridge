@@ -83,6 +83,8 @@ class BridgeConfig:
     local_ui: bool = True
     feishu_enabled: bool = False
     cloud_enabled: bool = False
+    relay_url: str = ""
+    relay_token_file: Path | None = None
     voice_enabled: bool = False
     voice_env_file: Path | None = None
     attachments_max_bytes: int = 10 * 1024 * 1024
@@ -316,6 +318,8 @@ def load_config(root: Path | None = None) -> BridgeConfig:
         local_ui=_env_bool(env_file, "DSH_BRIDGE_LOCAL_UI", True),
         feishu_enabled=_env_bool(env_file, "DSH_BRIDGE_FEISHU", False),
         cloud_enabled=_env_bool(env_file, "DSH_BRIDGE_CLOUD", False),
+        relay_url=_env(env_file, "DSH_BRIDGE_RELAY_URL", ""),
+        relay_token_file=_env_path(env_file, "DSH_BRIDGE_RELAY_TOKEN_FILE"),
         voice_enabled=_env_bool(env_file, "DSH_BRIDGE_VOICE", False),
         voice_env_file=voice_env,
         attachments_max_bytes=_env_int(env_file, "DSH_BRIDGE_ATTACHMENT_MAX_BYTES", 10 * 1024 * 1024),

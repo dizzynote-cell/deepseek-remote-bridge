@@ -26,6 +26,7 @@ const els = {
 };
 let threads = [], managedProjects = [], selected = null, threadLoading = false, lastThreadSignature = '';
 let nextCursor = null, threadVisibleCounts = new Map(), threadRequestSerial = 0, threadController = null, currentThread = null;
+window.addEventListener('bridge-voice-ready',()=>{lastThreadSignature='';});
 const mobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
 const narrowViewport = window.matchMedia('(max-width: 800px)');
 const applyCompactLayout = () => document.body.classList.toggle('mobile-ui', mobileDevice || narrowViewport.matches);
@@ -62,7 +63,9 @@ function paintModelChip() {
 }
 
 function paintModelMenu() {
-  if (els.modelOptions) {
+  const modelSignature = JSON.stringify([modelCatalog.models, modelSelection.model]);
+  if (els.modelOptions && els.modelOptions.dataset.signature !== modelSignature) {
+    els.modelOptions.dataset.signature = modelSignature;
     els.modelOptions.innerHTML = modelCatalog.models.map(item => `
       <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.model}" class="control-option ${item.id === modelSelection.model ? 'current' : ''}" data-model="${esc(item.id)}">
         <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
@@ -71,7 +74,9 @@ function paintModelMenu() {
       button.onclick = () => applyModel(button.dataset.model, modelSelection.effort);
     });
   }
-  if (els.effortOptions) {
+  const effortSignature = JSON.stringify([modelCatalog.efforts, modelSelection.effort]);
+  if (els.effortOptions && els.effortOptions.dataset.signature !== effortSignature) {
+    els.effortOptions.dataset.signature = effortSignature;
     els.effortOptions.innerHTML = modelCatalog.efforts.map(item => `
       <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.effort}" class="control-option ${item.id === modelSelection.effort ? 'current' : ''}" data-effort="${esc(item.id)}">
         <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
@@ -86,9 +91,11 @@ function paintModelMenu() {
 }
 
 async function loadModels(threadId) {
+  if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   try {
     const query = threadId ? `?threadId=${encodeURIComponent(threadId)}` : '';
-    const data = await (await bridgeFetch('/api/models' + query)).json();
+    const response=await bridgeFetch('/api/models' + query);if(!response.ok)throw new Error('models unavailable');const data=await response.json();if(!Array.isArray(data.models))throw new Error('models pending');
+    if((threadId && selected!==threadId)||(!threadId && selected))return;
     modelCatalog = data;
     modelSelection = {
       model: data.session?.model || data.bridgeDefault?.model || '',
@@ -177,6 +184,7 @@ function paintPermissionChip() {
 }
 
 async function loadPermissionCatalog() {
+  if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   try {
     const data = await (await bridgeFetch('/api/permissions')).json();
     permissionCatalog = {
@@ -199,7 +207,7 @@ async function loadPermissionCatalog() {
 async function syncThreadPermission(id) {
   if (!id) return;
   try {
-    const data = await (await bridgeFetch(`/api/permissions?threadId=${encodeURIComponent(id)}`)).json();
+    const response=await bridgeFetch(`/api/permissions?threadId=${encodeURIComponent(id)}`);if(!response.ok)throw new Error("permissions unavailable");const data=await response.json();if(selected!==id)return;
     const value = data.current || data.bridgeDefault || permissionCatalog.bridgeDefault;
     permissionCatalog.current = data.current || null;
     permissionCatalog.bridgeDefault = data.bridgeDefault || permissionCatalog.bridgeDefault;
@@ -221,35 +229,9 @@ function syncUrl(id) {
   } catch {}
 }
 
-function renderThreads() {
-  const q = els.search.value.trim().toLowerCase();
-  const filtered = threads.filter(t => `${t.name} ${projectName(t.cwd)} ${t.cwd || ''} ${t.id || ''}`.toLowerCase().includes(q));
-  const groups = new Map();
-  for (const t of filtered) {
-    const key = window.projectDisplay.key(t);
-    if (!groups.has(key)) groups.set(key, []);
-    groups.get(key).push(t);
-  }
-  els.count.textContent = `${filtered.length} 个会话 · ${groups.size} 个项目`;
-  els.threads.innerHTML = window.projectDisplay.groups(groups, managedProjects).map(([cwd, items]) => `
-    <section class="project-group">
-      <button class="project-heading" data-project-cwd="${esc(window.projectDisplay.cwd(cwd, managedProjects))}" data-project-kind="${cwd === 'desktop:projectless' ? 'standalone' : 'existing'}" title="点击在此项目中新建会话">
-        <span>${esc(projectName(cwd))}</span><small>${items.length} ＋</small>
-      </button>
-      ${items.map(t => {
-        const running = t.bridgeRunning === true;
-        return `<button class="thread ${selected === t.id ? 'active' : ''}" data-id="${esc(t.id)}">
-          <div class="thread-title">${esc(t.name)}${running ? '<span class="thread-live" title="运行中">●</span>' : ''}</div>
-          <div class="thread-meta"><span class="status-dot ${running ? 'running' : ''}"></span>${esc(running ? '运行中' : (statusLabel(t.status) === '当前已加载' ? '已载入' : '空闲'))}</div>
-        </button>`;
-      }).join('')}
-    </section>`).join('');
-  document.querySelectorAll('.project-heading').forEach(b => b.onclick = () => window.openLocalNewThread?.(b.dataset.projectKind || 'existing', b.dataset.projectCwd));
-  document.querySelectorAll('.thread').forEach(b => b.onclick = () => { document.body.classList.remove('sidebar-open'); loadThread(b.dataset.id); });
-  els.loadMore.hidden = !nextCursor;
-}
-
+function renderThreads(){return window.threadBrowser.render();}
 async function loadSwitchTargets() {
+  if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   try {
     const info = await (await bridgeFetch('/api/bridge-info')).json();
     const menu = info.logoMenu || {};
@@ -276,6 +258,7 @@ async function loadSwitchTargets() {
 }
 
 async function loadThreads(append = false) {
+  window.bridgeLoading?.begin();
   els.refresh.disabled = true;
   els.loadMore.disabled = true;
   try {
@@ -289,10 +272,12 @@ async function loadThreads(append = false) {
   } finally {
     els.refresh.disabled = false;
     els.loadMore.disabled = false;
+    window.bridgeLoading?.end();
   }
 }
 
 async function loadStatus() {
+  if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   try {
     const d = await (await bridgeFetch('/api/status')).json();
     els.mode.textContent = d.shortLabel || d.label || '运行状态未知';
@@ -337,6 +322,7 @@ function paintPhase(pricing) {
 }
 
 async function loadBalance(force = false) {
+  if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   const primary = els.balance.querySelector('[data-balance-primary]');
   const state = els.balance.querySelector('[data-balance-state]');
   const note = els.balance.querySelector('[data-balance-note]');
@@ -395,7 +381,7 @@ function reasoningText(i) {
 function renderItem(item, turn) {
   if (item.type === 'agentMessage') {
     const text = itemText(item);
-    return text ? `<div class="commentary markdown-body">${window.renderMarkdown(text)}</div>` : '';
+    return text ? `<div class="commentary markdown-body">${window.messageTime?.render(item, turn, 'assistant') || ''}${window.renderMarkdown(text)}</div>` : '';
   }
   if (item.type === 'reasoning') {
     const content = reasoningText(item).trim();
@@ -463,17 +449,17 @@ function renderTurns(turns) {
   if (!turns.length) return '<div class="empty"><h3>暂无历史</h3><p>在下方输入第一条消息，或在左侧新建会话。</p></div>';
   return turns.map(turn => {
     const items = turn.items || [];
-    const user = items.find(x => x.type === 'userMessage');
+    const users = items.filter(x => x.type === 'userMessage');
     const agents = items.filter(x => x.type === 'agentMessage');
     const final = [...agents].reverse().find(x => x.phase !== 'commentary');
-    const middle = items.filter(x => x !== user && x !== final).map(item => renderItem(item, turn)).join('');
+    const middle = items.filter(x => !users.includes(x) && x !== final).map(item => renderItem(item, turn)).join('');
     const answer = itemText(final) || (agents.length ? itemText(agents.at(-1)) : '');
     const modelLabel = turn.bridgeModel ? `${turn.bridgeModel.model}` : '模型未记录';
-    const turnStatus = turn.status === 'in_progress' ? '<span class="turn-running">运行中</span>' : '';
+    const turnStatus = turn.status === 'in_progress' ? `<span class="turn-running">${currentThread?.bridgeSync?.stale?'上次记录：运行中':'运行中'}</span>` : '';
     return `<article class="turn turn-${esc(turn.status || 'unknown')}">
-      <div class="user"><div class="label">你</div><div class="bubble">${esc(itemText(user) || '（非文字输入）')}${user?.bridgeImageCount ? `<span class="user-images">＋${user.bridgeImageCount} 张图片</span>` : ''}</div></div>
+      ${users.map((user,index)=>`<div class="user"><div class="label">${index?'补充引导':'你'}${window.messageTime?.render(user, turn, 'user') || ''}</div><div class="bubble">${esc(itemText(user) || '（非文字输入）')}${user?.bridgeImageCount ? `<span class="user-images">＋${user.bridgeImageCount} 张图片</span>` : ''}</div></div>`).join('')}
       ${middle}
-      <div class="assistant"><div class="label">DeepSeek Harness · ${esc(modelLabel)}${turnStatus}</div><div class="bubble"><div class="markdown-body">${window.renderMarkdown(answer || (turn.status === 'in_progress' ? '正在处理…' : '（尚无最终回答）'))}</div><div class="voice-actions">${final ? window.voiceUI?.record(turn, final, answer, 'final') || '' : ''}</div></div></div>
+      <div class="assistant"><div class="label">DeepSeek Harness · ${esc(modelLabel)}${turnStatus}${window.messageTime?.render(final, turn, 'assistant') || ''}</div><div class="bubble"><div class="markdown-body">${window.renderMarkdown(answer || (turn.status === 'in_progress' ? '正在处理…' : '（尚无最终回答）'))}</div><div class="voice-actions">${final ? window.voiceUI?.record(turn, final, answer, 'final') || '' : ''}</div></div></div>
       ${renderAttachments(turn)}
     </article>`;
   }).join('');
@@ -492,6 +478,7 @@ async function loadThread(id, silent = false, showOlder = false) {
   syncUrl(id);
   renderThreads();
   if (!silent) els.messages.innerHTML = '<div class="loading">正在读取最近对话…</div>';
+  window.bridgeLoading?.begin();
   try {
     const response = await bridgeFetch(`/api/thread/${encodeURIComponent(id)}?turnLimit=${limit}`, { signal: controller.signal, cache: 'no-store' });
     const data = await response.json();
@@ -502,21 +489,27 @@ async function loadThread(id, silent = false, showOlder = false) {
     }
     const t = data.thread || {};
     currentThread = t;
+    let syncNote=document.querySelector('#snapshot-note');
+    if(!syncNote){syncNote=document.createElement('div');syncNote.id='snapshot-note';syncNote.className='snapshot-note';els.messages.before(syncNote);}
+    const sync=t.bridgeSync;
+    syncNote.hidden=!sync;
+    if(sync)syncNote.textContent=(sync.online===false?'本机离线 · 显示已保存历史':'服务器快照')+(sync.syncedAt?' · 更新于 '+new Date(sync.syncedAt*1000).toLocaleString('zh-CN'):' · 此对话尚未缓存')+(sync.pending&&sync.online!==false?' · 正在向本机请求更新':'')+(sync.error?' · '+sync.error:'');
+
     const total = Number(t.bridgeTotalTurns ?? (t.turns || []).length), visible = (t.turns || []).length;
-    const signature = JSON.stringify([total, visible, (t.turns || []).map(turn => [turn.id, turn.status, (turn.items || []).length])]);
+    const signature = JSON.stringify([total, visible, t.bridgeSync?.pending, t.bridgeSync?.contentHash, (t.turns || []).map(turn => [turn.id, turn.status, (turn.items || []).length])]);
     const summary = threads.find(item => item.id === id);
     els.title.textContent = summary?.name || t.name || '未命名会话';
     const preset = t.bridgeAgentPreset ? ` · 预设 ${t.bridgeAgentPreset}` : '';
     const plan = Number(t.bridgeTodosTotal) ? ` · 计划 ${Number(t.bridgeTodosDone) || 0}/${Number(t.bridgeTodosTotal)}` : '';
     els.meta.textContent = `项目：${projectName(summary?.cwd || t.cwd)} · ${statusLabel(t.status)} · ${total} 轮${preset}${plan} · ID：${t.id || id}`;
-    renderActivity(t);
-    syncThreadPermission(id).catch(() => {});
-    loadModels(id).catch(() => {});
+    if(t.bridgeSync?.online===false)els.activity.hidden=true;else renderActivity(t);
+    window.bridgeLoading.background('thread-permissions:'+id,()=>selected===id?syncThreadPermission(id):undefined).catch(()=>{});
+    window.bridgeLoading.background('thread-models:'+id,()=>selected===id?loadModels(id):undefined).catch(()=>{});
     if (!silent || signature !== lastThreadSignature) {
       const nearBottom = els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 140;
       const remaining = Math.max(0, total - visible);
       const older = remaining ? `<div class="older-turns-wrap"><button id="load-older-turns" type="button">查看更早 6 轮（还有 ${remaining} 轮）</button><button id="load-all-turns" type="button">查看全部</button></div>` : '';
-      els.messages.innerHTML = older + renderTurns(t.turns || []);
+      els.messages.innerHTML = older + (sync && !sync.syncedAt && !(t.turns||[]).length ? `<div class="loading">${sync.online===false?'此对话尚未缓存，请等待本机上线':'正在从本机同步此对话…'}</div>` : renderTurns(t.turns || []));
       const olderButton = document.querySelector('#load-older-turns'), allButton = document.querySelector('#load-all-turns');
       if (olderButton) olderButton.onclick = () => { threadVisibleCounts.set(id, Math.min(total, Number(limit) + 6)); loadThread(id, false, true); };
       if (allButton) allButton.onclick = () => { threadVisibleCounts.set(id, 'all'); loadThread(id, false, true); };
@@ -529,6 +522,7 @@ async function loadThread(id, silent = false, showOlder = false) {
   } catch (error) {
     if (error.name !== 'AbortError' && !silent) els.messages.innerHTML = '<div class="loading">读取失败，请重试</div>';
   } finally {
+    window.bridgeLoading?.end();
     if (requestId === threadRequestSerial) { threadLoading = false; threadController = null; }
   }
 }
@@ -579,15 +573,12 @@ document.addEventListener('click', () => toggleProviderMenu(false));
 document.addEventListener('keydown', event => { if (event.key === 'Escape') toggleProviderMenu(false); });
 
 async function boot() {
-  await window.voiceUI?.boot();
-  await loadPermissionCatalog();
-  await loadModels();
-  paintPermissionChip();
-  paintPermissionMenu();
-  await loadSwitchTargets();
-  await loadThreads(false);
-  loadStatus();
-  loadBalance(false);
+  if(window.DSH_BRIDGE?.remote) await window.sessionUI?.remoteChoice();
+  try { await loadThreads(false); }
+  catch { els.threads.textContent='对话列表暂时不可用，请点击刷新'; }
+  finally { window.bridgeLoading?.release(); }
+  for(const[key,job]of [['status',loadStatus],['balance',()=>loadBalance(false)],['voice',()=>window.voiceUI?.boot()],['permissions',loadPermissionCatalog],['models',loadModels],['providers',loadSwitchTargets]])
+    window.bridgeLoading.background(key,job).catch(()=>{});
   setInterval(() => loadThreads(false), 20000);
   setInterval(loadStatus, 5000);
   setInterval(() => loadBalance(false), 60000);
@@ -597,14 +588,10 @@ async function boot() {
   activityTimer = setInterval(() => {
     if (currentThread && selected) renderActivity(currentThread);
   }, 1000);
-  try {
-    const wanted = new URLSearchParams(window.location.search).get('thread');
-    if (wanted && threads.some(item => item.id === wanted)) await loadThread(wanted);
-  } catch {}
 }
 async function changeSessionPermission(preset) {
   if (!preset) return;
-  const threadId = els.permissionChip.dataset.thread || selected;
+  const threadId = selected;
   if (!threadId) {
     showTaskNotice('先选择一个会话，或把它设为新会话默认权限', true);
     return;
@@ -670,17 +657,42 @@ function closeControlMenus() {
   });
 }
 
+function positionControlMenu(chip, menu) {
+  const viewport = window.visualViewport;
+  const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
+  const width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
+  const rect = chip.getBoundingClientRect();
+  const menuWidth = Math.min(300, width - 16);
+  Object.assign(menu.style, {position: 'fixed', width: `${menuWidth}px`, bottom: 'auto',
+    left: `${Math.max(left + 8, Math.min(rect.left, left + width - menuWidth - 8))}px`,
+    maxHeight: `${Math.max(48, height - 16)}px`, overflowY: 'auto'});
+  const above = rect.top - top - 8, below = top + height - rect.bottom - 8;
+  const preferAbove = above >= Math.min(menu.getBoundingClientRect().height, 180) || above >= below;
+  menu.style.maxHeight = `${Math.max(48, (preferAbove ? above : below) - 8)}px`;
+  const menuHeight = menu.getBoundingClientRect().height;
+  const wanted = preferAbove ? rect.top - menuHeight - 8 : rect.bottom + 8;
+  menu.style.top = `${Math.max(top + 8, Math.min(wanted, top + height - menuHeight - 8))}px`;
+}
+
 controlMenus.forEach(({ chip, menu, paint }) => {
+  // Escape the mobile row's scrolling/clipping context, keeping real buttons.
+  document.body.append(menu);
   chip.onclick = event => {
     event.stopPropagation();
     const open = menu.hidden;
     closeControlMenus();
     menu.hidden = !open;
     chip.setAttribute('aria-expanded', String(open));
-    if (open) paint();
+    if (open) { paint(); positionControlMenu(chip, menu); }
   };
   menu.onclick = event => event.stopPropagation();
 });
+const repositionControlMenus = () => controlMenus.forEach(({chip, menu}) => {
+  if (!menu.hidden) positionControlMenu(chip, menu);
+});
+window.addEventListener('resize', repositionControlMenus);
+window.visualViewport?.addEventListener('resize', repositionControlMenus);
+window.visualViewport?.addEventListener('scroll', repositionControlMenus);
 document.addEventListener('click', closeControlMenus);
 if (els.defaultPermission) els.defaultPermission.onchange = () => changeDefaultPermission(els.defaultPermission.value);
 

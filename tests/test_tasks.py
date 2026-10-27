@@ -86,6 +86,17 @@ def completed_events(message_id="message-new", turn=1, finish="completed"):
 
 
 class TaskTests(unittest.TestCase):
+    def test_missing_final_history_is_unknown_instead_of_success(self):
+        from unittest.mock import patch
+        tasks, handle, catalog = runner()
+        catalog.adapter.session = lambda _: (_ for _ in ()).throw(RuntimeError("offline"))
+        task = LocalTask(id="t", session_id="session-demo", cwd=None, created_at=0.0)
+        tasks._register(task)
+        with patch('app.tasks.time.sleep'):
+            tasks._follow(task, handle)
+        self.assertEqual(task.status, "unknown")
+        self.assertFalse(tasks.is_running("session-demo"))
+
     def test_busy_session_maps_to_a_rejection_without_resending(self):
         handle = FakeHandle({"session/resume": RpcError("session already owned by another process")})
         tasks, handle, _ = runner(handle)
