@@ -601,10 +601,7 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if operation == "new_thread":
                 cwd = str(payload.get("cwd") or "").strip()
                 title = str(payload.get("title") or "").strip()
-                if not cwd:
-                    raise TaskRejected("缺少项目目录")
-                if not _path_allowed(state, Path(cwd)):
-                    raise TaskRejected("该目录不在桥允许的工作区列表内", code="cwd_forbidden", status=403)
+                cwd = str(_prepare_new_cwd(state, cwd))
                 session_id = f"session-{uuid.uuid4()}"
                 preset = str(payload.get("permissionPreset") or "").strip()
                 if not preset:
@@ -718,6 +715,23 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 def _first(query: dict[str, list[str]], name: str) -> str:
     values = query.get(name)
     return values[0] if values else ""
+
+
+def _prepare_new_cwd(state: BridgeState, raw: str) -> Path:
+    """Create an allowed workspace before the Harness validates its existence."""
+    if not raw:
+        raise TaskRejected("缺少项目目录")
+    path = Path(raw)
+    if not path.is_absolute() or not _path_allowed(state, path):
+        raise TaskRejected("该目录不在桥允许的工作区列表内", code="cwd_forbidden", status=403)
+    try:
+        path = path.resolve()
+        path.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise TaskRejected(
+            f"无法创建工作目录：{error}", code="cwd_unavailable", status=400,
+        ) from None
+    return path
 
 
 def _path_allowed(state: BridgeState, path: Path) -> bool:

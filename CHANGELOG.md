@@ -1,5 +1,14 @@
 # 更新日志
 
+## Unreleased - optional desktop shortcut
+
+- 安装向导单独提供桌面桥快捷方式选项，与登录启动分开选择；快捷方式目标和图标均从当前安装目录生成。
+- 随包提供桌面快捷方式的鲸鱼 PNG 和多尺寸 ICO 图标。
+
+## Unreleased - new conversation workspace fix
+
+- 新项目与独立会话创建前，先校验工作区范围并建立缺失目录，避免 Harness 因目录不存在而拒绝创建；目录不可写时返回明确错误。
+
 ## Unreleased - account panel polish
 
 - Rename the footer entry and dialog to 登录设备管理. Keep the entry last after account or settings refreshes; constrain long panels to viewport height with touch scrolling.

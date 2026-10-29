@@ -71,7 +71,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```powershell
 .\install.ps1 -Unattended -Port 8766 `
   -ProjectsRoot "$env:USERPROFILE\DSH-Bridge\projects" `
-  -Preset workspace-write -NoAutostart
+  -Preset workspace-write -NoAutostart -NoDesktopShortcut
 ```
 
 重新配置用 `-Force`（会保留一份 `config/.env.bak`）。
@@ -110,10 +110,10 @@ python bridge.py                 # 前台运行，Ctrl+C 停止
 .\scripts\install-shortcuts.ps1 -Remove             # 两个都删掉
 ```
 
-- 桌面快捷方式叫 **DeepSeek Remote Bridge**，图标与页面左上角一致（`assets/bridge.ico`）；
+- 桌面快捷方式叫 **DeepSeek Remote Bridge**，图标使用仓库自带的鲸鱼标志（`assets/dphlogo.ico`，源图 `assets/dphlogo.png`）；
   双击后隐藏窗口启动桥和托盘，再打开页面；已经在运行就只打开页面。
 - 开机启动用的是当前用户的「启动」文件夹快捷方式（登录后运行），与你 Codex 桥的启动项互不影响。
-- 安装向导最后会问一次，默认两个都建。
+- 安装向导分别询问是否创建桌面快捷方式、是否登录后启动，两项可独立选择；无需先启用开机启动。无人值守安装可分别用 `-NoDesktopShortcut`、`-NoAutostart` 跳过。
 
 - 托盘是鲸鱼图标（`assets/bridge.ico`），右键可看状态、打开页面/日志、启动/停止/重启，双击打开页面。
 - Windows 10 默认把新图标放进 `^` 溢出区：点 `^` 找到 D 拖到任务栏，或运行

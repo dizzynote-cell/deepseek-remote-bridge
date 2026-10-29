@@ -16,7 +16,8 @@
 #   -VoiceEnvFile <path>  optional TTS credentials file (never copied into the repo)
 #   -Force                overwrite an existing config/.env (a .bak is kept)
 #   -NoStart              do not start the bridge at the end
-#   -NoAutostart          do not create the sign-in shortcut
+#   -NoAutostart          do not create the sign-in shortcut or recovery task
+#   -NoDesktopShortcut    do not create the desktop shortcut
 
 param(
   [switch]$Unattended,
@@ -28,7 +29,8 @@ param(
   [string]$VoiceEnvFile = '',
   [switch]$Force,
   [switch]$NoStart,
-  [switch]$NoAutostart
+  [switch]$NoAutostart,
+  [switch]$NoDesktopShortcut
 )
 
 $ErrorActionPreference = 'Stop'
@@ -176,8 +178,11 @@ Write-Ok "Wrote $configFile"
 if ((-not $NoStart) -and (AskYes 'Start the bridge now' 'Y')) {
   & (Join-Path $root 'scripts\start-bridge.ps1')
 }
-if ((-not $NoAutostart) -and (AskYes 'Create the desktop shortcut and start the bridge at Windows sign-in' 'Y')) {
-  & (Join-Path $root 'scripts\install-shortcuts.ps1') -Desktop -Startup | Out-Host
+if ((-not $NoDesktopShortcut) -and (AskYes 'Create a desktop bridge shortcut' 'Y')) {
+  & (Join-Path $root 'scripts\install-shortcuts.ps1') -Desktop | Out-Host
+}
+if ((-not $NoAutostart) -and (AskYes 'Start the bridge at Windows sign-in' 'Y')) {
+  & (Join-Path $root 'scripts\install-shortcuts.ps1') -Startup | Out-Host
 }
 if ((-not $NoAutostart) -and (AskYes 'Register the auto-recovery task (restarts the bridge within 3 minutes if it dies)' 'Y')) {
   & (Join-Path $root 'scripts\install-watchdog.ps1') -Minutes 3 | Out-Host

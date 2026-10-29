@@ -20,7 +20,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $root = (Resolve-Path (Join-Path $PSScriptRoot '..')).Path
 $launcher = Join-Path $root 'scripts\launch-bridge.ps1'
-$icon = Join-Path $root 'assets\bridge.ico'
+$icon = Join-Path $root 'assets\dphlogo.ico'
 $powershell = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $name = 'DeepSeek Remote Bridge.lnk'
 
