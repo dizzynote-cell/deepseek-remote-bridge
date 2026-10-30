@@ -22,7 +22,7 @@ ROOT = Path(__file__).resolve().parent.parent
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
-NODE_TESTS = ("test_markdown.cjs", "test_ui_contract.cjs", "test_sw_isolation.cjs", "test_bridge_auth.cjs", "test_control_menus.cjs", "test_message_time_ui.cjs", "test_thread_browser_controls.cjs", "test_session_activity.cjs")
+NODE_TESTS = ("test_new_thread_guard.cjs", "test_markdown.cjs", "test_ui_contract.cjs", "test_sw_isolation.cjs", "test_bridge_auth.cjs", "test_control_menus.cjs", "test_message_time_ui.cjs", "test_thread_browser_controls.cjs", "test_session_activity.cjs")
 
 
 def run_python(argv: list[str]) -> int:
