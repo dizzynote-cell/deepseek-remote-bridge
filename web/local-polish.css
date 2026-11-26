@@ -95,3 +95,9 @@ body.mobile-ui .control-menu{width:min(82vw,300px)}
 body.mobile-ui .composer{flex-wrap:nowrap}
 
 .snapshot-note{padding:7px 14px;font-size:11px;line-height:1.5;color:var(--muted);border-bottom:1px solid var(--line);flex-shrink:0}.snapshot-note[hidden]{display:none}
+
+/* Neutral chat surfaces keep the blue accent on actions and status. */
+:root{--bg:#090b0e;--user:#191d26}
+.composer textarea{background:#0e1014}
+.composer{background:#111419}
+.user .bubble{border-color:#2e3440}

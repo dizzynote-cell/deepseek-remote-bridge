@@ -105,3 +105,8 @@ body.mobile-ui .balance-details { width: min(310px, calc(100vw - 32px)); }
   -webkit-overflow-scrolling: touch;
   scrollbar-gutter: stable;
 }
+
+.wallet-settings{margin-top:12px;border-top:1px solid var(--line);padding-top:12px}
+.wallet-settings .voice-setting{display:flex;align-items:center;gap:8px;color:var(--text);font-size:12px}
+.wallet-settings select{background:var(--panel);color:var(--text);border:1px solid var(--line);border-radius:7px;padding:5px}
+.wallet-settings .settings-note{margin:6px 0;color:var(--muted);font-size:11px;line-height:1.5}

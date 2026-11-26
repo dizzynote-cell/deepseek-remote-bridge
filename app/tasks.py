@@ -19,6 +19,7 @@ from typing import Any
 import json
 from pathlib import Path
 
+from .dsh_adapter import AdapterClient, AdapterError
 from .dsh_rpc import RpcError
 from .dsh_runtime import RouteKey
 from .history_view import project_session
@@ -155,12 +156,13 @@ class TaskRunner:
         preset: str | None = None,
         model: str | None = None,
         effort: str | None = None,
+        provider: str | None = None,
     ) -> LocalTask:
         if not cwd:
             raise TaskRejected("缺少工作目录")
         session_id = session_id or f"session-{uuid.uuid4()}"
         key = RouteKey(
-            self.config.provider,
+            provider or self.config.provider,
             model or self.config.model,
             effort or self.config.reasoning_effort,
         )
@@ -181,10 +183,10 @@ class TaskRunner:
                 handle.call("session/working-directory/set", {"sessionId": session_id, "path": cwd}, timeout=120.0)
                 handle.opened_sessions.add(session_id)
             if preset:
-                try:
-                    self.catalog.adapter.set_permission(session_id, preset)
-                except Exception as error:  # noqa: BLE001 - keep the first turn alive
-                    task.detail["permissionError"] = str(error)
+                adapter = AdapterClient(handle.adapter_port, handle.adapter_token)
+                applied = adapter.set_permission(session_id, preset)
+                if not isinstance(applied, dict) or applied.get("current") != preset:
+                    raise AdapterError("运行时未确认所选权限")
             response = handle.call(
                 "session/prompt",
                 {"sessionId": session_id, "contentBlocks": content_blocks},
@@ -193,13 +195,17 @@ class TaskRunner:
             task.message_id = (response or {}).get("messageId")
             task.status = "running"
             task.message = STATUS_MESSAGE["running"]
+        except AdapterError as error:
+            message = f"会话已建立，但权限设置失败，第一条消息未发送：{error}"
+            self._finish(task, "failed", message)
+            raise TaskRejected(message, code="permission_failed", status=409) from None
         except RpcError as error:
             self._finish(task, "failed", str(error))
             raise TaskRejected(f"创建会话失败：{error}", code="create_failed", status=502) from None
         threading.Thread(target=self._follow, args=(task, handle), name=f"task-{task.id}", daemon=True).start()
         return task
 
-    def switch_route(self, session_id: str, model: str, effort: str) -> RouteKey:
+    def switch_route(self, session_id: str, model: str, effort: str, provider: str | None = None) -> RouteKey:
         """Move a session to another model route by restarting that route's runtime.
 
         The SDK fixes the route per runtime process, so this is the only honest
@@ -207,7 +213,7 @@ class TaskRunner:
         same session on the new one. The harness appends a new ``request/header``,
         which is why the transcript still shows the earlier model's turns.
         """
-        target = RouteKey(self.config.provider, model, effort)
+        target = RouteKey(provider or self.config.provider, model, effort)
         with self.lock:
             current = self.session_routes.get(session_id) or self.default_route()
         if target == current:
@@ -343,16 +349,17 @@ class TaskRunner:
                 continue
             model = str(value.get("model") or "")
             effort = str(value.get("effort") or "")
-            if model not in models.MODEL_IDS or effort not in models.EFFORT_IDS:
+            provider = str(value.get("provider") or self.config.provider)
+            if not all(models.valid_route_part(part) for part in (provider, model)) or (effort and not models.valid_route_part(effort)):
                 continue
-            self.session_routes[str(session_id)] = RouteKey(self.config.provider, model, effort)
+            self.session_routes[str(session_id)] = RouteKey(provider, model, effort)
 
     def _save_routes(self) -> None:
         if self.routes_path is None:
             return
         with self.lock:
             payload = {
-                session_id: {"model": key.model, "effort": key.reasoning_effort}
+                session_id: {"provider": key.provider, "model": key.model, "effort": key.reasoning_effort}
                 for session_id, key in self.session_routes.items()
             }
         try:

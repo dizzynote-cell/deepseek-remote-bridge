@@ -29,14 +29,14 @@ class FakeTasks:
 
         return RouteKey("deepseek-account", "deepseek-flash", "max")
 
-    def switch_route(self, session_id, model, effort):
+    def switch_route(self, session_id, model, effort, provider="deepseek-account"):
         if session_id == "session-running":
             from app.tasks import TaskRejected
 
             raise TaskRejected("该会话正在运行，等它结束后再切换模型。", code="session_running", status=409)
         from app.dsh_runtime import RouteKey
 
-        return RouteKey("deepseek-account", model, effort)
+        return RouteKey(provider, model, effort)
 
     def active_task_for(self, session_id):
         return None
@@ -342,6 +342,26 @@ class HttpSurfaceTests(unittest.TestCase):
         )
         self.assertEqual(status, 200)
         self.assertEqual(json.loads(body)["session"], {"model": "deepseek-v4-pro", "effort": "low"})
+
+    def test_native_provider_selection_survives_defaults_and_session_switch(self):
+        from unittest.mock import patch
+        from app import models
+        native = {"models": [
+            {"provider":"deepseek-account", "id":"deepseek-flash", "efforts":[{"id":"high"}]},
+            {"provider":"example", "id":"custom", "efforts":[{"id":"medium"},{"id":"xhigh"}], "defaultEffort":"medium"},
+        ]}
+        with patch.object(models, '_discovered', {}), patch.object(FakePermissionAdapter, 'models', lambda _: native, create=True):
+            _, port = self.build()
+            url = f'http://127.0.0.1:{port}/api/models'
+            self.assertEqual(len(json.loads(get(url)[1])['models']), 2)
+            status, body, _ = get(url, method='POST', payload={'model':'example::custom','effort':'xhigh'})
+            self.assertEqual(status, 200, body)
+            self.assertEqual(json.loads(get(url)[1])['bridgeDefault'], {'model':'example::custom','effort':'xhigh'})
+            status, body, _ = get(url, method='POST', payload={'threadId':'session-idle','model':'example::custom','effort':'medium'})
+            self.assertEqual(status, 200, body)
+            self.assertEqual(json.loads(body)['session']['model'], 'example::custom')
+            status, _, _ = get(url, method='POST', payload={'model':'example::custom','effort':'max'})
+            self.assertEqual(status, 400)
 
     def test_unknown_model_is_refused(self):
         _, port = self.build()

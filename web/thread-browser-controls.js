@@ -89,5 +89,5 @@
       }
     }catch(e){note.textContent=e.message;}
   }
-  window.threadBrowser={render,sort,activity,epoch};
+  window.threadBrowser={render,sort,activity,epoch,modal};
 })();

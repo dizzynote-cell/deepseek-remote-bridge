@@ -16,6 +16,7 @@
 import http from "node:http";
 
 export const name = "dsh-remote-bridge-adapter";
+export const inject = ["llm"];
 
 const VERSION = "1.0.0";
 
@@ -486,6 +487,21 @@ export function apply(ctx, config) {
       }
       if (req.method === "GET" && path === "/balance") {
         json(res, 200, await readBalance(url.searchParams));
+        return;
+      }
+      if (req.method === "GET" && path === "/models") {
+        const models = [];
+        // Native metadata contains no endpoint or credential configuration.
+        for (const provider of ctx.llm.listProviders()) {
+          for (const model of await ctx.llm.listModels(provider.id)) {
+            const info = await ctx.llm.resolveModelInfo(provider.id, model.id);
+            models.push({ provider: provider.id, id: model.id, name: model.name,
+              inputModalities: info.inputModalities || ['text'],
+              efforts: info.reasoning?.efforts || [{ id: 'default', name: '默认' }],
+              defaultEffort: info.reasoning?.defaultEffort || info.reasoning?.efforts?.[0]?.id || 'default' });
+          }
+        }
+        json(res, 200, { models });
         return;
       }
       if (req.method === "GET" && path === "/sessions") {

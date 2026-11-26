@@ -6,13 +6,15 @@ const els={modelOptions:optionContainer(),effortOptions:optionContainer(),modelN
 const catalog={models:[{id:'a',name:'A'},{id:'b',name:'B'}],efforts:[{id:'low',name:'Low'}]};
 const selection={model:'a',effort:'low'};
 const context=vm.createContext({els,modelCatalog:catalog,modelSelection:selection,esc:String,window:{},applyModel(){}});
+vm.runInContext(source.slice(source.indexOf('function modelEfforts('),source.indexOf('function modelLabels(')),context);
 vm.runInContext(source.slice(source.indexOf('function paintModelMenu()'),source.indexOf('async function loadModels(')),context);
 vm.runInContext('paintModelMenu();paintModelMenu()',context);
 assert.equal(els.modelOptions.writes,1,'background refresh must keep existing model buttons');
 assert.equal(els.effortOptions.writes,1,'background refresh must keep existing effort buttons');
 selection.model='b';vm.runInContext('paintModelMenu()',context);
 assert.equal(els.modelOptions.writes,2);assert.equal(els.effortOptions.writes,1);
-vm.runInContext(source.slice(source.indexOf('function positionControlMenu('),source.indexOf('controlMenus.forEach(({ chip, menu, paint })')),context);
+const frame=fs.readFileSync(path.join(__dirname,'../web/bridge-frame.js'),'utf8');
+vm.runInContext(frame.slice(frame.indexOf('function positionControlMenu('),frame.indexOf('controlMenus.forEach(({ chip, menu, paint })')),context);
 for(const [width,height,x,y] of [[360,740,310,650],[430,400,200,160],[1280,850,400,740]]){
  context.window.visualViewport={offsetLeft:0,offsetTop:0,width,height};
  context.chip={getBoundingClientRect:()=>({left:x,top:y,bottom:y+44})};

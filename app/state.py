@@ -5,16 +5,20 @@
 
 from __future__ import annotations
 
+import os
+from pathlib import Path
+import subprocess
 import threading
 import time
 import urllib.parse
 from typing import Any
 
+from . import models
 from .attachments import AttachmentStore, ReturnedFiles
 from .balance import BalanceService
 from .config import BridgeConfig
 from .dsh_adapter import AdapterClient, AdapterError
-from .dsh_runtime import RuntimePool, stage_diagnostics
+from .dsh_runtime import RuntimePool, RuntimeUnavailable, stage_diagnostics
 from .interactions import InteractionBridge
 from .preferences import Preferences
 from .sessions import SessionCatalog
@@ -64,11 +68,46 @@ class BridgeState:
         self.started_at = time.time()
         self.boot_error = ""
         self._runtime_lock = threading.Lock()
+        self._model_lock = threading.Lock()
+        self._model_profile_stamp = None
 
     # -- services -------------------------------------------------------
     def adapter(self) -> AdapterClient:
         handle = self.pool.acquire()
         return AdapterClient(handle.adapter_port, handle.adapter_token)
+
+    def refresh_model_catalog(self, check_profile: bool = False) -> None:
+        if not check_profile and self._model_profile_stamp is not None:
+            return
+        with self._model_lock:
+            if not check_profile and self._model_profile_stamp is not None:
+                return
+            home = Path(self.config.dsh_home or os.environ.get("DSH_HOME") or Path.home() / ".dsh")
+            stamp = []
+            try:
+                for profile in ("desktop", "sdk"):
+                    path = home / "profiles" / profile / "cordis.patch.yml"
+                    try:
+                        stat = path.stat()
+                        stamp.append((stat.st_mtime_ns, stat.st_size))
+                    except FileNotFoundError:
+                        stamp.append(None)
+                stamp = tuple(stamp)
+                if stamp == self._model_profile_stamp:
+                    return
+                patch = self.config.runtime_dir / "patch-model-catalog.yml"
+                handle = None
+                try:
+                    # Reopen the current profile without touching any task runtime.
+                    handle = self.pool._start(self.pool.default_key(), 20, catalog_patch=patch)
+                    if models.refresh(AdapterClient(handle.adapter_port, handle.adapter_token)):
+                        self._model_profile_stamp = stamp
+                finally:
+                    if handle is not None:
+                        handle.process.kill()
+                    patch.unlink(missing_ok=True)
+            except (AdapterError, RuntimeUnavailable, OSError, ValueError, subprocess.TimeoutExpired):
+                pass  # Keep the last successful directory.
 
     def interaction_adapters(self) -> dict[str, AdapterClient]:
         self.pool.acquire()

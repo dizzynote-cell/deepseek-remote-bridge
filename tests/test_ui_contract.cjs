@@ -74,7 +74,8 @@ assert.match(html, /Codex/);
 assert.ok(fs.existsSync(path.join(web, 'voice-ui.js')), 'voice-ui.js missing');
 assert.ok(fs.existsSync(path.join(web, 'voice.css')), 'voice.css missing');
 assert.match(html, /id="voice-toggle"/);
-assert.match(html, /id="settings-dialog"/);
+assert.match(html, /id="balance-details"[\s\S]*?class="wallet-settings"[\s\S]*?id="voice-toggle"[\s\S]*?id="default-permission"/);
+assert.doesNotMatch(html, /id="settings-dialog"|id="settings"/);
 for (const file of ['voice-ui.js', 'app.js']) {
   const source = fs.readFileSync(path.join(web, file), 'utf8');
   assert.doesNotMatch(source, /VOLC_API_KEY|X-Api-Key/, `${file} must not carry provider credentials`);

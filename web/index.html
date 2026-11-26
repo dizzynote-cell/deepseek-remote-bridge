@@ -14,17 +14,18 @@
   <link rel="apple-touch-icon" href="apple-touch-icon.png?v=2">
   <link rel="manifest" href="manifest.webmanifest">
   <!-- bridge-boot -->
+  <script defer src="bridge-frame.js?v=1"></script>
   <script defer src="bridge-client.js?v=20261028-snapshots"></script>
   <link rel="stylesheet" href="styles.css?v=1">
   <link rel="stylesheet" href="mode.css?v=1">
   <link rel="stylesheet" href="scrollbars.css?v=1">
   <link rel="stylesheet" href="attachments.css?v=1">
-  <link rel="stylesheet" href="projects.css?v=1">
+  <link rel="stylesheet" href="projects.css?v=20261121-create">
   <link rel="stylesheet" href="thread-browser.css?v=1">
   <link rel="stylesheet" href="mobile.css?v=1">
   <link rel="stylesheet" href="local-composer.css?v=1">
-  <link rel="stylesheet" href="local-polish.css?v=20261028-snapshots">
-  <link rel="stylesheet" href="balance.css?v=20261028-scroll-panels">
+  <link rel="stylesheet" href="local-polish.css?v=deep-neutral">
+  <link rel="stylesheet" href="balance.css?v=wallet-settings">
   <link rel="stylesheet" href="markdown.css?v=1">
   <link rel="stylesheet" href="interactions.css?v=1">
   <link rel="stylesheet" href="provider-menu.css?v=1">
@@ -32,39 +33,24 @@
 </head>
 <body>
   <main class="shell">
-    <dialog id="settings-dialog" class="settings-dialog">
-      <form method="dialog">
-        <header><strong>设置</strong><button id="close-settings" type="button">×</button></header>
-        <label class="voice-setting"><input id="voice-toggle" type="checkbox"> 显示语音朗读按钮</label>
-        <p id="voice-note" class="settings-note"></p>
-        <p class="settings-note">语音只在本机合成：浏览器只拿到缓存键和音频地址，TTS 密钥始终留在桥的配置里。</p>
-        <hr>
-        <label class="voice-setting">新会话默认权限 <select id="default-permission" aria-label="新会话默认权限"></select></label>
-        <p id="permission-note" class="settings-note"></p>
-        <footer><button id="settings-done" type="button" class="primary">完成</button></footer>
-      </form>
-    </dialog>
+
     <dialog id="new-thread-dialog" class="new-thread-dialog">
       <form id="new-thread-form" method="dialog">
         <header><strong>新建会话</strong><button id="close-new-thread" type="button">×</button></header>
-        <div class="new-thread-kinds">
-          <label><input type="radio" name="thread-kind" value="existing" checked> 现有项目</label>
-          <label><input type="radio" name="thread-kind" value="project"> 新建项目</label>
-          <label><input type="radio" name="thread-kind" value="standalone"> 独立会话</label>
+        <template data-bridge-new-fields></template>
+        <div class="new-thread-model-row">
+          <label>模型<select id="new-thread-model" required disabled></select></label>
+          <label>推理强度<select id="new-thread-effort" required disabled></select></label>
         </div>
-        <label id="existing-project-row">项目<select id="new-thread-project"></select></label>
-        <label id="new-project-row" hidden>项目名称<input id="new-project-name" maxlength="80" placeholder="例如：桥接联调"></label>
-        <label>会话名称<input id="new-thread-title" maxlength="100" required></label>
-        <label>第一条消息<textarea id="new-thread-text" rows="4" required placeholder="输入这个会话要开始处理的内容"></textarea></label>
-        <label>权限 <select id="new-thread-permission" aria-label="权限预设"></select></label>
+        <label>权限范围<select id="new-thread-permission" required disabled></select></label>
+        <p id="new-thread-options-status" role="status" class="new-thread-location" hidden></p>
+        <button id="retry-new-thread-options" type="button" hidden>重新加载选项</button>
         <p id="new-thread-location" class="new-thread-location"></p>
         <footer><button id="cancel-new-thread" type="button">取消</button><button type="submit" class="primary">创建并发送</button></footer>
       </form>
     </dialog>
-    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
-    <aside class="sidebar">
-      <header class="brand">
-        <div class="brand-switch">
+    <template data-frame-slot="brand">
+<div class="brand-switch">
           <button id="provider-toggle" class="logo" type="button" aria-haspopup="menu" aria-expanded="false" aria-label="切换后端：当前 DeepSeek Harness"><img src="logo-64.png?v=2" alt="" width="40" height="40" draggable="false"></button>
           <div id="provider-menu" class="provider-menu" role="menu" hidden>
             <p class="provider-menu-head">选择后端</p>
@@ -77,30 +63,34 @@
           </div>
         </div>
         <div><h1>DeepSeek Bridge</h1><p>网页、飞书与主机统一协作</p></div>
-      </header>
-      <label class="search"><span>⌕</span><input id="search" placeholder="搜索会话或项目"></label>
-      <div class="summary"><span id="count">0 个会话</span><span><button id="new-thread">新建</button><button id="refresh">刷新</button></span></div>
-      <nav id="threads" class="threads"></nav>
-      <button id="load-more" class="load-more" hidden>查看更早会话</button>
-    </aside>
-    <section class="conversation">
-      <header class="conversation-head">
-        <button id="menu" class="menu-button" aria-label="打开会话列表">会话</button>
-        <div class="conversation-title"><h2 id="title">选择一个会话</h2><p id="meta">从左侧查看 DeepSeek Harness 历史</p></div>
+</template>
+<template data-frame-slot="side">
+<button id="load-more" class="load-more" hidden>查看更早会话</button>
+</template>
+<template data-frame-slot="heading">
+<div class="conversation-title"><h2 id="title">选择一个会话</h2><p id="meta">从左侧查看 DeepSeek Harness 历史</p></div>
         <div class="head-actions">
           <div class="balance-wrap">
             <button id="balance" class="balance" type="button" title="点击查看余额详情" aria-expanded="false">
               <span class="balance-labels"><strong data-balance-primary>余额 --</strong><strong data-balance-state>读取中</strong><span class="phase-badge" data-balance-phase hidden>--</span></span>
               <span class="balance-note" data-balance-note>账户余额</span>
             </button>
-            <div id="balance-details" class="balance-details" hidden></div>
+            <div id="balance-details" class="balance-details" hidden>
+              <div id="wallet-content"></div>
+              <section class="wallet-settings" aria-label="偏好设置"><label class="voice-setting"><input id="voice-toggle" type="checkbox"> 显示语音朗读按钮</label>
+        <p id="voice-note" class="settings-note"></p>
+        <p class="settings-note">语音只在本机合成：浏览器只拿到缓存键和音频地址，TTS 密钥始终留在桥的配置里。</p>
+        <hr>
+        <label class="voice-setting">新会话默认权限 <select id="default-permission" aria-label="新会话默认权限"></select></label>
+        <p id="permission-note" class="settings-note"></p></section>
+            </div>
           </div>
-          <button id="settings" class="icon-button" type="button" aria-label="打开设置" title="设置">⚙</button>
           <div id="mode" class="mode detecting">正在检测运行时</div>
           <div class="readonly">可输入</div>
         </div>
-      </header>
-      <div id="messages" class="messages">
+</template>
+<template data-frame-slot="conversation">
+<div id="messages" class="messages">
         <div class="empty"><div class="empty-icon">↖</div><h3>选择一个会话开始工作</h3><p>这里显示的是 DeepSeek Harness 的真实会话、工具执行与终态。</p></div>
       </div>
       <section id="activity-strip" class="activity-strip" role="status" aria-live="polite" hidden></section>
@@ -143,12 +133,12 @@
         <button id="send" type="submit">发送</button>
       </form>
       <div id="file-list" class="file-list" hidden></div>
-    </section>
+</template>
   </main>
   <script defer src="lib/markdown-it-15.0.3.min.js"></script>
   <script defer src="markdown.js?v=1"></script>
   <script defer src="project-display.js?v=1"></script>
-  <script defer src="voice-ui.js?v=20261028-snapshots"></script>
+  <script defer src="voice-ui.js?v=wallet-settings"></script>
   <link rel="stylesheet" href="message-time.css?v=20261027">
   <script defer src="message-time.js?v=20261027"></script>
   <link rel="stylesheet" href="thread-browser-controls.css?v=20261027">
@@ -157,8 +147,8 @@
   <link rel="stylesheet" href="session-ui.css?v=20261028-account-footer">
   <script defer src="session-ui.js?v=20261028-device-management"></script>
   <script defer src="new-thread-guard.js?v=20261030-create-lock"></script>
-  <script defer src="app.js?v=20261028-snapshots"></script>
-  <script defer src="local-composer.js?v=20261030-create-lock"></script>
+  <script defer src="app.js?v=model-page-load"></script>
+  <script defer src="local-composer.js?v=20261121-task-status"></script>
   <script defer src="interactions.js?v=20261028-snapshots"></script>
   <script defer src="bridge-switcher.js?v=20261028-snapshots" data-provider="deepseek-harness"></script>
 </body>

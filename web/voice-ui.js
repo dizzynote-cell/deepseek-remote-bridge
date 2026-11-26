@@ -97,7 +97,7 @@
     close.setAttribute('aria-label', '关闭语音播放器');
     close.onclick = closePlayer;
     dock.append(dockLabel, dockMessage, close);
-    const messages = document.querySelector('#messages');
+    const messages = document.querySelector('.messages');
     if (messages) messages.after(dock); else document.body.append(dock);
     return dock;
   }
@@ -173,7 +173,7 @@
     const entries = [...records.entries()].filter(([, item]) => item.threadId === id);
     if (!entries.length) return;
     await Promise.all(entries.map(async ([ref, item]) => {
-      if (!item.key) item.key = await digest(item.text);
+      if (!item.key && window.crypto?.subtle) item.key = await digest(item.text);
     }));
     try {
       const keys = [...new Set(entries.map(([, item]) => item.key).filter(Boolean))];
@@ -221,7 +221,7 @@
     return settings;
   }
 
-  async function boot() {
+  async function boot(onPreferenceChange) {
     await refreshSettings();
     const toggle = document.querySelector('#voice-toggle');
     if (toggle) {
@@ -234,7 +234,8 @@
             body: JSON.stringify({ voiceEnabled: enabled })
           });
           preferences = { voiceEnabled: result.voiceEnabled !== false };
-          window.location.reload();
+          if (typeof onPreferenceChange === 'function') await onPreferenceChange();
+          else window.location.reload();
         } catch (error) {
           event.target.checked = !enabled;
           alert(`设置保存失败：${error.message}`);
@@ -243,7 +244,7 @@
     }
     clearInterval(pollTimer);
     pollTimer = setInterval(() => {
-      if (document.querySelector('#settings-dialog')?.open) refreshSettings();
+      if (document.querySelector('#balance-details')?.hidden === false) refreshSettings();
     }, 15000);
   }
 

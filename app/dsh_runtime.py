@@ -14,9 +14,11 @@ the shipped ``sdk`` profile and the user's global DSH profile stay untouched.
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 import re
 import socket
+import subprocess
 import threading
 import time
 import uuid
@@ -90,10 +92,10 @@ class RuntimePool:
 
     # -- patch generation ----------------------------------------------
     def _patch_path(self, key: RouteKey) -> Path:
-        slug = "-".join(part.replace("/", "_") for part in (key.provider, key.model, key.reasoning_effort or "default"))
+        slug = route_slug(key)
         return self.config.runtime_dir / f"patch-{slug}.yml"
 
-    def _write_patch(self, key: RouteKey, adapter_port: int, token: str) -> Path:
+    def _write_patch(self, key: RouteKey, adapter_port: int, token: str, path: Path | None = None) -> Path:
         """Write the profile patch that mounts the host adapter and fixes the preset.
 
         The patch file is rewritten on every start so the adapter port and token
@@ -111,9 +113,18 @@ class RuntimePool:
             "preset": self.config.permission_preset,
             "route": {"provider": key.provider, "model": key.model, "reasoningEffort": key.reasoning_effort},
         }
-        path = self._patch_path(key)
+        path = path or self._patch_path(key)
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(render_patch(patch), encoding="utf-8")
+        helper = self.config.root / "adapter" / "provider-profile.cjs"
+        result = subprocess.run(
+            [str(self.config.dsh_exe), str(helper), str(self.config.dsh_cli), str(path),
+             str(self.config.dsh_home) if self.config.dsh_home else ""],
+            env=self._environment(), capture_output=True, timeout=20,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        if result.returncode:
+            raise RuntimeUnavailable("Cannot read local DSH model-provider profile; check its YAML configuration.")
         return path
 
     # -- acquisition ----------------------------------------------------
@@ -170,18 +181,18 @@ class RuntimePool:
     def default_key(self) -> RouteKey:
         return RouteKey(self.config.provider, self.config.model, self.config.reasoning_effort)
 
-    def _start(self, key: RouteKey, timeout: float) -> RuntimeHandle:
+    def _start(self, key: RouteKey, timeout: float, catalog_patch: Path | None = None) -> RuntimeHandle:
         adapter_port = _free_port()
         token = self.config.adapter_token
-        patch = self._write_patch(key, adapter_port, token)
-        stderr_log = self.config.logs_dir / f"runtime-{key.label.replace('/', '-').replace(':', '-')}.log"
+        patch = self._write_patch(key, adapter_port, token, catalog_patch)
+        stderr_log = self.config.logs_dir / ("runtime-model-catalog.log" if catalog_patch else f"runtime-{route_slug(key)}.log")
         process = RuntimeProcess(
             command=self._command(patch),
             env=self._environment(),
             cwd=self.config.runtime_dir,
             stderr_log=stderr_log,
-            on_notification=self._on_notification,
-            on_exit=self._on_exit,
+            on_notification=(lambda *_: None) if catalog_patch else self._on_notification,
+            on_exit=(lambda *_: None) if catalog_patch else self._on_exit,
             default_timeout=120.0,
         )
         handle = RuntimeHandle(key, process, adapter_port, token)
@@ -191,14 +202,15 @@ class RuntimePool:
                 "provider": key.provider,
                 "model": key.model,
             }
-            if key.reasoning_effort:
+            if key.reasoning_effort and key.reasoning_effort != "default":
                 params["reasoningEffort"] = key.reasoning_effort
             if self.config.max_tokens > 0:
                 params["maxTokens"] = self.config.max_tokens
             result = process.call("initialize", params, timeout=timeout)
             handle.server_info = (result or {}).get("serverInfo") or {}
         except RpcError as error:
-            self.last_error = str(error)
+            if not catalog_patch:
+                self.last_error = str(error)
             process.kill()
             raise RuntimeUnavailable(f"cannot initialize the DeepSeek Harness runtime: {error}") from None
         return handle
@@ -235,6 +247,12 @@ class RuntimePool:
                 handle.process.close()
             except Exception:
                 pass
+
+
+def route_slug(key: RouteKey) -> str:
+    safe = re.sub(r"[^A-Za-z0-9._-]", "_", key.label)[:100]
+    digest = hashlib.sha256(key.label.encode()).hexdigest()[:12]
+    return f"{safe}-{digest}"
 
 
 def render_patch(patch: dict[str, Any]) -> str:

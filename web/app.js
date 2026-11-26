@@ -13,8 +13,6 @@ const els = {
   providerToggle: document.querySelector('#provider-toggle'), providerMenu: document.querySelector('#provider-menu'),
   providerSibling: document.querySelector('#provider-sibling'), providerSiblingName: document.querySelector('#provider-sibling-name'),
   providerSiblingNote: document.querySelector('#provider-sibling-note'),
-  settings: document.querySelector('#settings'), settingsDialog: document.querySelector('#settings-dialog'),
-  closeSettings: document.querySelector('#close-settings'), settingsDone: document.querySelector('#settings-done'),
   defaultPermission: document.querySelector('#default-permission'),
   modelChip: document.querySelector('#model-chip'), modelMenu: document.querySelector('#model-menu'),
   modelOptions: document.querySelector('#model-options'), modelNote: document.querySelector('#model-note'),
@@ -27,11 +25,6 @@ const els = {
 let threads = [], managedProjects = [], selected = null, threadLoading = false, lastThreadSignature = '';
 let nextCursor = null, threadVisibleCounts = new Map(), threadRequestSerial = 0, threadController = null, currentThread = null;
 window.addEventListener('bridge-voice-ready',()=>{lastThreadSignature='';});
-const mobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && Math.min(screen.width, screen.height) < 900);
-const narrowViewport = window.matchMedia('(max-width: 800px)');
-const applyCompactLayout = () => document.body.classList.toggle('mobile-ui', mobileDevice || narrowViewport.matches);
-applyCompactLayout();
-narrowViewport.addEventListener?.('change', applyCompactLayout);
 const esc = window.bridgeEscape;
 const imageExtensions = new Set(['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp', 'ico', 'tiff', 'heic']);
 const statusLabels = { completed: '已完成', failed: '失败', interrupted: '已中断', cancelled: '已取消', in_progress: '进行中', running: '进行中' };
@@ -41,9 +34,13 @@ let permissionCatalog = { options: [], defaultPreset: null, bridgeDefault: '' };
 let modelCatalog = { models: [], efforts: [], bridgeDefault: { model: '', effort: '' }, session: null };
 let modelSelection = { model: '', effort: '' };
 
+function modelEfforts(model = modelSelection.model) {
+  return modelCatalog.models.find(item => item.id === model)?.efforts || modelCatalog.efforts;
+}
+
 function modelLabels() {
   const model = modelCatalog.models.find(item => item.id === modelSelection.model);
-  const effort = modelCatalog.efforts.find(item => item.id === modelSelection.effort);
+  const effort = modelEfforts().find(item => item.id === modelSelection.effort);
   return {
     model: model ? model.short : (modelSelection.model || '模型'),
     effort: effort ? effort.name : (modelSelection.effort || ''),
@@ -74,10 +71,11 @@ function paintModelMenu() {
       button.onclick = () => applyModel(button.dataset.model, modelSelection.effort);
     });
   }
-  const effortSignature = JSON.stringify([modelCatalog.efforts, modelSelection.effort]);
+  const efforts = modelEfforts();
+  const effortSignature = JSON.stringify([efforts, modelSelection.effort]);
   if (els.effortOptions && els.effortOptions.dataset.signature !== effortSignature) {
     els.effortOptions.dataset.signature = effortSignature;
-    els.effortOptions.innerHTML = modelCatalog.efforts.map(item => `
+    els.effortOptions.innerHTML = efforts.map(item => `
       <button type="button" role="menuitemradio" aria-checked="${item.id === modelSelection.effort}" class="control-option ${item.id === modelSelection.effort ? 'current' : ''}" data-effort="${esc(item.id)}">
         <strong>${esc(item.name)}</strong><small>${esc(item.note || '')}</small>
       </button>`).join('');
@@ -93,9 +91,15 @@ function paintModelMenu() {
 async function loadModels(threadId) {
   if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   try {
-    const query = threadId ? `?threadId=${encodeURIComponent(threadId)}` : '';
+    const query = threadId ? `?threadId=${encodeURIComponent(threadId)}` : '?refresh=1';
     const response=await bridgeFetch('/api/models' + query);if(!response.ok)throw new Error('models unavailable');const data=await response.json();if(!Array.isArray(data.models))throw new Error('models pending');
-    if((threadId && selected!==threadId)||(!threadId && selected))return;
+    if(threadId && selected!==threadId)return;
+    if(!threadId && selected){
+      modelCatalog = {...data, session:modelCatalog.session};
+      paintModelChip();
+      paintModelMenu();
+      return;
+    }
     modelCatalog = data;
     modelSelection = {
       model: data.session?.model || data.bridgeDefault?.model || '',
@@ -107,9 +111,14 @@ async function loadModels(threadId) {
 }
 
 async function applyModel(model, effort) {
-  if (!model || !effort) return;
+  if (!model || els.modelChip.disabled) return;
+  const entry = modelCatalog.models.find(item => item.id === model);
+  const efforts = modelEfforts(model);
+  if (!efforts.some(item => item.id === effort)) effort = entry?.defaultEffort || efforts[0]?.id;
+  if (!effort) return;
   const threadId = selected;
   els.modelChip.disabled = true;
+  els.effortChip.disabled = true;
   try {
     const response = await bridgeFetch('/api/models', {
       method: 'POST',
@@ -118,6 +127,7 @@ async function applyModel(model, effort) {
     });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || '切换失败');
+    if (selected !== threadId) return;
     modelSelection = { model, effort };
     paintModelChip();
     paintModelMenu();
@@ -129,6 +139,7 @@ async function applyModel(model, effort) {
     showTaskNotice(`模型切换失败：${error.message}`, true);
   } finally {
     els.modelChip.disabled = false;
+    els.effortChip.disabled = false;
   }
 }
 
@@ -280,7 +291,8 @@ async function loadStatus() {
   if(window.bridgeLoading&&!window.bridgeLoading.allowed())return;
   try {
     const d = await (await bridgeFetch('/api/status')).json();
-    els.mode.textContent = d.shortLabel || d.label || '运行状态未知';
+    els.mode.textContent = d.mode === 'local' ? '模式：网页' : (d.shortLabel || d.label || '运行状态未知');
+    els.mode.title = d.label || '';
     els.mode.className = `mode ${d.mode || 'detecting'}`;
   } catch {
     els.mode.textContent = '运行时状态不可用';
@@ -338,7 +350,7 @@ async function loadBalance(force = false) {
     els.balance.classList.toggle('stale', Boolean(d.stale));
     const rows = (d.entries || []).map(entry => `
       <tr><td>${esc(currencySymbol(entry.currency))}${esc(entry.currency)}</td><td>${entry.wallet === 'bonus' ? '赠送钱包' : '充值钱包'}</td><td class="amount">${esc(money(entry.amount))}</td></tr>`).join('');
-    els.balanceDetails.innerHTML = `
+    document.querySelector("#wallet-content").innerHTML = `
       <strong>DeepSeek Harness 账户余额</strong>
       <p class="balance-source">来源：${esc(d.source || 'harness-account')} · 更新时间：${esc(formatTime(d.updatedAt))}${d.stale ? ' · 数据可能过期' : ''}</p>
       ${rows ? `<table class="balance-table"><thead><tr><th>币种</th><th>钱包</th><th>金额</th></tr></thead><tbody>${rows}</tbody></table>` : '<p class="balance-empty">没有可显示的余额条目。</p>'}
@@ -354,17 +366,15 @@ async function loadBalance(force = false) {
     state.textContent = '读取失败';
     note.textContent = '稍后重试';
     els.balance.classList.add('unavailable');
-    els.balanceDetails.innerHTML = '<span>暂时没有可用的余额数据。</span>';
+    document.querySelector("#wallet-content").innerHTML = '<span>暂时没有可用的余额数据。</span>';
   }
 }
 
-els.balance.onclick = event => {
-  event.stopPropagation();
-  els.balanceDetails.hidden = !els.balanceDetails.hidden;
-  els.balance.setAttribute('aria-expanded', String(!els.balanceDetails.hidden));
-};
-els.balanceDetails.onclick = event => event.stopPropagation();
-document.addEventListener('click', () => { els.balanceDetails.hidden = true; els.balance.setAttribute('aria-expanded', 'false'); });
+window.bindBridgeAccountPanel(els.balance, els.balanceDetails, () => {
+  window.voiceUI?.refreshSettings();
+  loadPermissionCatalog();
+});
+
 
 function itemText(i) {
   if (!i) return '';
@@ -504,7 +514,7 @@ async function loadThread(id, silent = false, showOlder = false) {
     els.meta.textContent = `项目：${projectName(summary?.cwd || t.cwd)} · ${statusLabel(t.status)} · ${total} 轮${preset}${plan} · ID：${t.id || id}`;
     if(t.bridgeSync?.online===false)els.activity.hidden=true;else renderActivity(t);
     window.bridgeLoading.background('thread-permissions:'+id,()=>selected===id?syncThreadPermission(id):undefined).catch(()=>{});
-    window.bridgeLoading.background('thread-models:'+id,()=>selected===id?loadModels(id):undefined).catch(()=>{});
+    if (!silent) window.bridgeLoading.background('thread-models:'+id,()=>selected===id?loadModels(id):undefined).catch(()=>{});
     if (!silent || signature !== lastThreadSignature) {
       const nearBottom = els.messages.scrollHeight - els.messages.scrollTop - els.messages.clientHeight < 140;
       const remaining = Math.max(0, total - visible);
@@ -650,61 +660,9 @@ const controlMenus = [
   { chip: els.permissionChip, menu: els.permissionMenu, paint: paintPermissionMenu },
 ].filter(entry => entry.chip && entry.menu);
 
-function closeControlMenus() {
-  controlMenus.forEach(({ chip, menu }) => {
-    menu.hidden = true;
-    chip.setAttribute('aria-expanded', 'false');
-  });
-}
-
-function positionControlMenu(chip, menu) {
-  const viewport = window.visualViewport;
-  const left = viewport?.offsetLeft || 0, top = viewport?.offsetTop || 0;
-  const width = viewport?.width || window.innerWidth, height = viewport?.height || window.innerHeight;
-  const rect = chip.getBoundingClientRect();
-  const menuWidth = Math.min(300, width - 16);
-  Object.assign(menu.style, {position: 'fixed', width: `${menuWidth}px`, bottom: 'auto',
-    left: `${Math.max(left + 8, Math.min(rect.left, left + width - menuWidth - 8))}px`,
-    maxHeight: `${Math.max(48, height - 16)}px`, overflowY: 'auto'});
-  const above = rect.top - top - 8, below = top + height - rect.bottom - 8;
-  const preferAbove = above >= Math.min(menu.getBoundingClientRect().height, 180) || above >= below;
-  menu.style.maxHeight = `${Math.max(48, (preferAbove ? above : below) - 8)}px`;
-  const menuHeight = menu.getBoundingClientRect().height;
-  const wanted = preferAbove ? rect.top - menuHeight - 8 : rect.bottom + 8;
-  menu.style.top = `${Math.max(top + 8, Math.min(wanted, top + height - menuHeight - 8))}px`;
-}
-
-controlMenus.forEach(({ chip, menu, paint }) => {
-  // Escape the mobile row's scrolling/clipping context, keeping real buttons.
-  document.body.append(menu);
-  chip.onclick = event => {
-    event.stopPropagation();
-    const open = menu.hidden;
-    closeControlMenus();
-    menu.hidden = !open;
-    chip.setAttribute('aria-expanded', String(open));
-    if (open) { paint(); positionControlMenu(chip, menu); }
-  };
-  menu.onclick = event => event.stopPropagation();
-});
-const repositionControlMenus = () => controlMenus.forEach(({chip, menu}) => {
-  if (!menu.hidden) positionControlMenu(chip, menu);
-});
-window.addEventListener('resize', repositionControlMenus);
-window.visualViewport?.addEventListener('resize', repositionControlMenus);
-window.visualViewport?.addEventListener('scroll', repositionControlMenus);
-document.addEventListener('click', closeControlMenus);
+window.bindBridgeControlMenus(controlMenus);
 if (els.defaultPermission) els.defaultPermission.onchange = () => changeDefaultPermission(els.defaultPermission.value);
 
-els.settings.onclick = () => {
-  window.voiceUI?.refreshSettings();
-  loadPermissionCatalog();
-  els.settingsDialog.showModal();
-};
-els.closeSettings.onclick = () => els.settingsDialog.close();
-els.settingsDone.onclick = () => els.settingsDialog.close();
-els.menu.onclick = () => document.body.classList.add('sidebar-open');
-els.backdrop.onclick = () => document.body.classList.remove('sidebar-open');
 els.search.oninput = renderThreads;
 els.refresh.onclick = () => { loadThreads(); if (selected) loadThread(selected, true); loadBalance(true); };
 els.loadMore.onclick = () => loadThreads(true);

@@ -188,6 +188,9 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
 
     # -- API ------------------------------------------------------------
     def _route_api(self, method: str, path: str, query: dict[str, list[str]]) -> None:
+        if path.startswith("/api/antigravity/"):
+            from . import antigravity
+            return antigravity.handle(self, method, path.removeprefix("/api/antigravity/"), query)
         state = self.state
         if method in {"GET", "HEAD"}:
             if path == "/api/health":
@@ -374,23 +377,35 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             thread["bridgeAttachments"] = files
 
     # -- models ----------------------------------------------------------
+    def _refresh_models(self, check_profile=False):
+        if hasattr(self.state, "refresh_model_catalog"):
+            return self.state.refresh_model_catalog(check_profile)
+        adapter = self.state.catalog.adapter
+        if hasattr(adapter, "models"):
+            try:
+                models.refresh(adapter)
+            except AdapterError:
+                pass  # Retain the last known catalog during transient outages.
+
     def _bridge_route(self):
         preferences = self.state.preferences.snapshot()
-        model = preferences.get("model") or self.state.config.model
+        configured_model = models.selection_id(self.state.config.provider, self.state.config.model)
+        model = preferences.get("model") or configured_model
         effort = preferences.get("reasoningEffort") or self.state.config.reasoning_effort
         try:
-            return models.resolve(self.state.config.provider, model, effort, self.state.config.model, self.state.config.reasoning_effort)
+            return models.resolve(self.state.config.provider, model, effort, configured_model, self.state.config.reasoning_effort)
         except models.RouteError:
-            return models.resolve(self.state.config.provider, None, None, self.state.config.model, self.state.config.reasoning_effort)
+            return models.resolve(self.state.config.provider, None, None, configured_model, self.state.config.reasoning_effort)
 
     def _api_models(self, query: dict[str, list[str]]) -> None:
+        self._refresh_models(check_profile=_first(query, "refresh") == "1")
         session_id = _first(query, "threadId") or ""
         route = None
         if session_id:
             key = self.state.tasks.route_for(session_id)
-            route = models.Route(self.state.config.provider, key.model, key.reasoning_effort)
+            route = models.Route(key.provider, key.model, key.reasoning_effort)
         bridge = self._bridge_route()
-        self._json(models.catalog(self.state.config.provider, bridge.model, bridge.effort, route))
+        self._json(models.catalog(self.state.config.provider, models.selection_id(bridge.provider, bridge.model), bridge.effort, route))
 
     def _api_set_model(self) -> None:
         try:
@@ -399,28 +414,30 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             self._error(400, str(error), "bad_request")
             return
         session_id = str(payload.get("threadId") or "").strip()
+        self._refresh_models()
         bridge = self._bridge_route()
         try:
             route = models.resolve(
                 self.state.config.provider,
                 str(payload.get("model") or ""),
                 str(payload.get("effort") or ""),
-                bridge.model,
+                models.selection_id(bridge.provider, bridge.model),
                 bridge.effort,
             )
         except models.RouteError as error:
             self._error(400, str(error), error.code)
             return
         if not session_id:
-            self.state.preferences.update({"model": route.model, "reasoningEffort": route.effort})
-            self._json({"ok": True, "bridgeDefault": {"model": route.model, "effort": route.effort}})
+            selected = models.selection_id(route.provider, route.model)
+            self.state.preferences.update({"model": selected, "reasoningEffort": route.effort})
+            self._json({"ok": True, "bridgeDefault": {"model": selected, "effort": route.effort}})
             return
         try:
-            key = self.state.tasks.switch_route(session_id, route.model, route.effort)
+            key = self.state.tasks.switch_route(session_id, route.model, route.effort, provider=route.provider)
         except TaskRejected as error:
             self._error(error.http_status, str(error), error.code)
             return
-        self._json({"ok": True, "session": {"model": key.model, "effort": key.reasoning_effort}})
+        self._json({"ok": True, "session": {"model": models.selection_id(key.provider, key.model), "effort": key.reasoning_effort}})
 
     # -- permissions -----------------------------------------------------
     def _api_permissions(self, query: dict[str, list[str]]) -> None:
@@ -437,6 +454,7 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             {
                 "options": payload.get("options") or [],
                 "defaultPreset": payload.get("defaultPreset"),
+                "confirmsPermissionBeforeFirstTurn": True,
                 "current": payload.get("current"),
                 "bridgeDefault": preferences.get("permissionPreset") or state.config.permission_preset,
                 "threadId": session_id,
@@ -601,19 +619,25 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             if operation == "new_thread":
                 cwd = str(payload.get("cwd") or "").strip()
                 title = str(payload.get("title") or "").strip()
+                preset = str(payload.get("permissionPreset") or "").strip()
+                if preset:
+                    options = state.catalog.adapter.permissions(None).get("options") or []
+                    if not any(option.get("value") == preset for option in options):
+                        raise TaskRejected("该权限范围不在当前运行时的可选列表中", code="unknown_preset", status=400)
+                else:
+                    preset = str(state.preferences.snapshot().get("permissionPreset") or state.config.permission_preset)
+                self._refresh_models()
+                bridge_route = self._bridge_route()
+                route = models.resolve(state.config.provider, str(payload.get("model") or ""),
+                                       str(payload.get("effort") or ""),
+                                       models.selection_id(bridge_route.provider, bridge_route.model), bridge_route.effort)
                 cwd = str(_prepare_new_cwd(state, cwd))
                 session_id = f"session-{uuid.uuid4()}"
-                preset = str(payload.get("permissionPreset") or "").strip()
-                if not preset:
-                    preset = str(state.preferences.snapshot().get("permissionPreset") or state.config.permission_preset)
                 staged, images = state.attachments.stage(session_id, files)
                 blocks = _content_blocks(text + state.attachments.prompt_suffix(staged), images)
-                bridge_route = self._bridge_route()
-                model = str(payload.get("model") or "").strip() or bridge_route.model
-                effort = str(payload.get("effort") or "").strip() or bridge_route.effort
                 task = state.tasks.create_session(
                     cwd, blocks, session_id=session_id, preset=preset or None,
-                    model=model, effort=effort,
+                    model=route.model, effort=route.effort, provider=route.provider,
                 )
                 if title:
                     task.detail["title"] = title
@@ -633,6 +657,8 @@ class BridgeRequestHandler(BaseHTTPRequestHandler):
             self._error(error.http_status, str(error), error.code)
         except AttachmentError as error:
             self._error(413, str(error), "attachment_rejected")
+        except models.RouteError as error:
+            self._error(400, str(error), error.code)
         except AdapterError as error:
             self._error(502, f"读取会话失败：{error}", "adapter_error")
 

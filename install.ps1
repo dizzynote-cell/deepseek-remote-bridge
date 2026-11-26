@@ -21,6 +21,7 @@
 
 param(
   [switch]$Unattended,
+  [switch]$PairWithCodex,
   [string]$DshExe = '',
   [int]$Port = 8766,
   [string]$ProjectsRoot = '',
@@ -102,7 +103,13 @@ Write-Step '[3/6] Local port'
 if (-not $Unattended) { $Port = [int](Ask 'Listen port (the Codex bridge uses 8765, keep that free)' $Port) }
 $busy = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction SilentlyContinue
 if ($busy) { throw "Port $Port is already in use. Pick another port or stop the process that owns it." }
-Write-Ok "Will listen on http://127.0.0.1:$Port/"
+if (-not $Unattended -and -not $PairWithCodex) {
+  $PairWithCodex = AskYes 'Pair with Codex Remote Bridge on this PC' 'N'
+}
+if ($PairWithCodex -and $Port -ne 8766) { throw 'Local Codex pairing uses port 8766.' }
+$basePath = if ($PairWithCodex) { '/dsh/' } else { '/' }
+$sibling = if ($PairWithCodex) { 'http://127.0.0.1:8765/' } else { '' }
+Write-Ok "Will listen on http://127.0.0.1:${Port}$basePath"
 
 # ---- 4. Workspaces --------------------------------------------------------
 Write-Step '[4/6] Folders for new sessions'
@@ -153,7 +160,8 @@ if (Test-Path $configFile) { Copy-Item $configFile "$configFile.bak" -Force }
 $values = [ordered]@{
   'DSH_BRIDGE_HOST'                  = '127.0.0.1'
   'DSH_BRIDGE_PORT'                  = "$Port"
-  'DSH_BRIDGE_BASE_PATH'             = '/'
+  'DSH_BRIDGE_BASE_PATH'             = $basePath
+  'DSH_BRIDGE_SIBLING_URL'            = $sibling
   'DSH_EXE'                          = $exePath
   'DSH_CLI'                          = $cliPath
   'DSH_HOME'                         = ''
@@ -189,7 +197,8 @@ if ((-not $NoAutostart) -and (AskYes 'Register the auto-recovery task (restarts 
 }
 
 Write-Host "`nSetup complete." -ForegroundColor Green
-Write-Host "  Page      : http://127.0.0.1:$Port/"
+Write-Host "  Page      : http://127.0.0.1:${Port}$basePath"
+Write-Host '  Optional  : follow docs/antigravity.md to enable Antigravity.'
 Write-Host "  Tray      : green D in the notification area (right-click for start/stop/restart)"
 Write-Host "  Phone     : same Wi-Fi + a reverse proxy or tunnel with HTTPS, then add it to the home screen"
 Write-Host "  Next      : sign in to DeepSeek Harness once so the runtime has an account; the bridge never stores your password"

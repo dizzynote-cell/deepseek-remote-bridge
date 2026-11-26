@@ -1,0 +1,64 @@
+:root{
+  --bg:#0b090e;--panel:#17131c;--panel2:#211b29;--line:#38313f;
+  --text:#f1edf4;--muted:#aea3b6;--accent:#c2a3ef;--user:#211a28;
+  --ag-input:#100d14;--ag-bar:#16121b;--ag-selected:#302339;
+  accent-color:var(--accent)
+}
+.conversation-head,.composer,.control-bar{background:var(--ag-bar)}
+.search,.control-chip,.control-option,.composer textarea,
+.new-thread-dialog input,.new-thread-dialog select,.new-thread-dialog textarea{background:var(--ag-input)}
+.control-menu,.new-thread-dialog,.session-dialog{background:var(--panel)}
+.user .bubble,.composer textarea:focus{border-color:#55425f}
+.control-chip:hover,.control-chip[aria-expanded=true],.control-option:hover,.control-option.current,
+.balance[aria-expanded=true],.new-thread-dialog footer button{background:var(--ag-selected);border-color:#674f77}
+.new-thread-dialog footer .primary,.composer #send{background:var(--accent);color:#201529}
+.mode.local,.readonly{background:#201826;border-color:#46354f;color:#d2b6e9}
+button.logo:focus-visible,.control-chip:focus-visible,.balance:focus-visible{outline:2px solid var(--accent)}
+.brand .bridge-provider-menu{background:var(--panel);border-color:var(--line)}
+.brand .bridge-provider-menu button:hover{background:var(--ag-selected)}
+#quota-preview meter,#limits meter{--quota-fill:var(--accent);accent-color:var(--quota-fill)}
+#quota-preview meter.weekly-quota,#limits meter.weekly-quota{--quota-fill:#b65368}
+#quota-preview meter::-webkit-meter-optimum-value,#limits meter::-webkit-meter-optimum-value{background:var(--quota-fill)}
+.markdown-body :is(pre,code,th){background:var(--ag-bar);border-color:var(--line)}
+.markdown-body a{color:var(--accent)}
+.task-strip:not(.error):not(.interrupted):not(.cancelled){background:#1b1520;color:#dbc8e7}
+.threads,.messages,.markdown-table{scrollbar-color:#584b62 var(--panel)}
+.brand .bridge-provider-menu small,.control-label,.new-thread-dialog label{color:var(--muted)}
+.control-option.current strong,.thread.active .thread-title{color:var(--text)}
+.menu-button,.new-thread-dialog .new-thread-kinds label{border-color:var(--line)}
+
+.conversation,.messages{min-height:0}
+#notice:empty,#new-error:empty{display:none}
+
+#quota-preview{display:flex;align-items:center;gap:3px;min-height:10px}
+#quota-preview meter{display:block;width:19px;min-width:0;height:10px}
+body.mobile-ui .head-actions{display:grid;grid-template-columns:auto auto;gap:3px;justify-items:end}
+body.mobile-ui .head-actions .balance-wrap{grid-column:1/-1}
+body.mobile-ui .head-actions .mode,body.mobile-ui .head-actions .readonly{display:block;padding:1px 4px;font-size:10px;white-space:nowrap}
+#limits meter{display:block;width:100%;margin-top:8px}
+#limits strong,#limits span,#limits small{display:block}
+#limits small{color:var(--muted)}
+#limits p{border-bottom:1px solid var(--line);padding-bottom:10px}
+.control-bar .control-chip{max-width:min(30vw,220px);font:inherit}
+#history .bubble{overflow-wrap:anywhere}
+#new-dialog [hidden]{display:none}
+#new-error{color:#ffb5bd}
+.control-bar select[hidden]{display:none}
+
+#quota-preview meter::-moz-meter-bar,#limits meter::-moz-meter-bar{background:var(--quota-fill)}
+.voice-button.cached{background:var(--ag-selected);border-color:var(--line);color:var(--accent)}
+
+.thread-meta .desktop-origin{color:#b9a2cf}
+.desktop-origin::before{content:'';display:inline-block;width:6px;height:6px;margin-right:5px;vertical-align:1px;border-radius:50%;background:currentColor}
+
+#composer,body.mobile-ui #composer{flex-wrap:wrap}
+#composer #prompt{flex:1;min-width:0}
+.ag-composer-actions{display:flex;align-items:center;gap:8px}
+#attach{background:var(--panel);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
+#files[hidden],.ag-file-list[hidden]{display:none}
+.ag-file-list{flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap}
+.ag-file{display:flex;align-items:center;gap:8px;max-width:100%;padding:6px 8px;border:1px solid var(--line);background:var(--panel);border-radius:10px}
+.ag-file img{width:44px;height:38px;object-fit:cover;border-radius:5px}
+.ag-file span{font-size:12px;overflow-wrap:anywhere;min-width:0}
+.ag-file button{padding:3px 8px;flex-shrink:0}
+@media(max-width:600px){.ag-composer-actions{width:100%;justify-content:space-between}.ag-file-list{max-height:150px;overflow:auto}}

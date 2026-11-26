@@ -74,6 +74,9 @@ class AdapterClient:
         return self._request("GET", f"/balance?{query}", timeout=45.0)
 
     # -- sessions -------------------------------------------------------
+    def models(self) -> dict[str, Any]:
+        return self._request("GET", "/models", timeout=30.0)
+
     def sessions(self, limit: int = 200) -> dict[str, Any]:
         return self._request("GET", f"/sessions?limit={int(limit)}", timeout=60.0)
 

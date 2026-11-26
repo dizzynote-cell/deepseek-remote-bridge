@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Antigravity 工作台</title>
+  <link rel="icon" href="antigravity-logo.svg">
+  <link rel="stylesheet" href="styles.css?v=1">
+  <link rel="stylesheet" href="mode.css?v=1">
+  <link rel="stylesheet" href="scrollbars.css?v=1">
+  <link rel="stylesheet" href="projects.css?v=20261121-create">
+  <link rel="stylesheet" href="thread-browser.css?v=1">
+  <link rel="stylesheet" href="mobile.css?v=1">
+  <link rel="stylesheet" href="local-composer.css?v=1">
+  <link rel="stylesheet" href="local-polish.css?v=deep-neutral">
+  <link rel="stylesheet" href="balance.css?v=wallet-settings">
+  <link rel="stylesheet" href="markdown.css?v=1">
+  <link rel="stylesheet" href="provider-menu.css?v=1">
+  <link rel="stylesheet" href="voice.css?v=1">
+  <link rel="stylesheet" href="thread-browser-controls.css?v=1">
+  <link rel="stylesheet" href="antigravity.css?v=attachments">
+</head><body><main class="shell">
+  <template data-frame-slot="brand">
+<div class="brand-switch"><button id="provider-toggle" class="logo" type="button"><img src="antigravity-logo.svg" alt="" width="40" height="40"></button></div>
+      <div><h1>Antigravity Bridge</h1><p>网页与本机工作台</p></div>
+</template>
+<template data-frame-slot="side">
+
+</template>
+<template data-frame-slot="heading">
+<div class="conversation-title"><h2 id="heading">选择一个会话</h2><p id="meta">从会话列表查看 Antigravity 历史</p></div>
+      <div class="head-actions">
+        <div class="balance-wrap">
+          <button id="quota" class="balance" aria-expanded="false">
+            <span class="balance-labels"><strong data-balance-primary>额度明细</strong></span>
+            <span id="quota-preview" class="balance-note">读取中</span>
+          </button>
+          <div id="quota-details" class="balance-details" hidden><h3>额度明细</h3><div id="limits"></div>
+            <section class="wallet-settings" aria-label="朗读设置">
+              <label class="voice-setting"><input id="voice-toggle" type="checkbox" disabled> 显示语音朗读按钮</label>
+              <p id="voice-note" class="settings-note">正在读取朗读设置…</p>
+            </section>
+          </div>
+        </div>
+        <div id="runtime-mode" class="mode local" title="网页提交任务，由本机 Antigravity 命令行执行">模式：网页</div>
+        <div id="input-state" class="readonly" role="status">待选会话</div>
+      </div>
+</template>
+<template data-frame-slot="conversation">
+<div id="history" class="messages"><div class="empty"><div class="empty-icon">↖</div><h3>选择一个会话开始工作</h3></div></div>
+    <div id="notice" class="task-strip" role="status"></div>
+        <div id="reply-model" class="task-strip" hidden></div>
+        <div class="control-bar">
+          <label class="control-group">模型<select class="control-chip" id="model"><option value="">账号默认</option></select></label>
+          <label class="control-group" hidden>工具权限<select class="control-chip" id="permission"><option value="default">默认权限</option><option value="full">完全权限（自动批准）</option></select></label>
+          <label class="control-group">执行模式<select class="control-chip" id="mode"><option value="default">默认</option><option value="plan">规划</option><option value="accept-edits">允许编辑</option></select></label>
+        </div>
+
+    <form id="composer" class="composer"><div id="file-list" class="ag-file-list" hidden></div><textarea rows="1" id="prompt" aria-label="消息"></textarea><div class="ag-composer-actions"><button type="button" id="attach" disabled aria-label="上传附件" title="上传文件或粘贴截图">＋ 附件</button><input type="file" id="files" multiple hidden><button id="send" disabled>发送</button></div></form>
+</template>
+  </main>
+<dialog class="new-thread-dialog" id="new-dialog"><form id="new-form"><header><strong>新建会话</strong><button type="button" id="close-new" aria-label="关闭">×</button></header>
+        <template data-bridge-new-fields data-title-optional></template>
+<div id="new-controls"></div><p role="status" id="new-error"></p>
+<footer><button type="button" id="cancel-new">取消</button><button class="primary" type="submit">创建并发送</button></footer></form></dialog>
+  <script src="lib/markdown-it-15.0.3.min.js"></script><script src="markdown.js"></script>
+  <script src="bridge-frame.js?v=1"></script>
+  <link rel="stylesheet" href="session-ui.css?v=20261028-account-footer">
+  <script src="session-ui.js?v=20261028-device-management"></script>
+  <script src="bridge-client.js?v=ag-voice" data-relative-base></script>
+  <script src="voice-ui.js?v=ag-voice"></script>
+  <script src="thread-browser-controls.js?v=ag-library" data-provider="antigravity"></script>
+  <script src="composer-files.js?v=1"></script>
+  <script src="antigravity.js?v=history-pagination"></script>
+  <script src="bridge-switcher.js?v=ag-shell-1" data-provider="antigravity"></script>
+</body></html>

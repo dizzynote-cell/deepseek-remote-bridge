@@ -5,6 +5,8 @@
 from __future__ import annotations
 
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from app import models
 
@@ -49,6 +51,50 @@ class ResolveTests(unittest.TestCase):
         self.assertEqual(labels["model"], "V4 Pro")
         self.assertEqual(labels["modelName"], "DeepSeek-V4-Pro")
         self.assertEqual(labels["effort"], "关闭")
+
+
+class NativeCatalogTests(unittest.TestCase):
+    def setUp(self):
+        self.registry = patch.object(models, "_discovered", {})
+        self.registry.start()
+        self.addCleanup(self.registry.stop)
+
+    def publish(self):
+        models.refresh(SimpleNamespace(models=lambda: {"models": [
+            {"provider": "gateway", "id": "deepseek-v4-pro", "name": "Gateway Pro",
+             "efforts": [{"id": "medium"}, {"id": "xhigh"}], "defaultEffort": "medium",
+             "apiKey": "must-not-leak", "baseURL": "must-not-leak"},
+            {"provider": "deepseek-account", "id": "deepseek-v4-pro", "name": "Account Pro",
+             "efforts": [{"id": "high"}], "defaultEffort": "high"},
+            {"provider": "gateway", "id": "plain", "name": "Plain",
+             "efforts": [{"id": "default"}], "defaultEffort": "default"},
+        ]}))
+
+    def test_provider_identity_and_supported_efforts(self):
+        self.publish()
+        route = models.resolve("deepseek-account", "gateway::deepseek-v4-pro", "xhigh", "deepseek-v4-pro", "high")
+        self.assertEqual((route.provider, route.model, route.effort), ("gateway", "deepseek-v4-pro", "xhigh"))
+        with self.assertRaises(models.RouteError):
+            models.resolve("deepseek-account", "gateway::deepseek-v4-pro", "max", "deepseek-v4-pro", "high")
+        ids = [item["id"] for item in models.available()]
+        self.assertEqual(len(set(ids)), 3)
+        payload = models.catalog("deepseek-account", "deepseek-v4-pro", "high", route)
+        self.assertEqual(payload["session"]["model"], "gateway::deepseek-v4-pro")
+        self.assertNotIn("must-not-leak", str(payload))
+
+    def test_missing_effort_uses_model_default_and_plain_model_supported(self):
+        self.publish()
+        route = models.resolve("deepseek-account", "gateway::plain", "", "deepseek-v4-pro", "high")
+        self.assertEqual(route.effort, "default")
+        route = models.resolve("deepseek-account", "gateway::deepseek-v4-pro", None, "deepseek-v4-pro", "high")
+        self.assertEqual(route.effort, "medium")
+
+    def test_refresh_removes_stale_models(self):
+        self.publish()
+        models.refresh(SimpleNamespace(models=lambda: {"models": [
+            {"provider": "gateway", "id": "new", "efforts": [{"id": "low"}]}
+        ]}))
+        self.assertEqual([item["id"] for item in models.available()], ["gateway::new"])
 
 
 if __name__ == "__main__":

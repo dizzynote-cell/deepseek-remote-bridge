@@ -79,6 +79,8 @@ class BridgeConfig:
     # Workspaces offered for new sessions.
     projects_root: Path = field(default_factory=lambda: Path.home() / "DSH-Bridge" / "projects")
     standalone_dir: Path = field(default_factory=lambda: Path.home() / "DSH-Bridge" / "sessions")
+    antigravity_projects_root: Path | None = None
+    antigravity_standalone_dir: Path | None = None
     # Modes.
     local_ui: bool = True
     feishu_enabled: bool = False
@@ -315,6 +317,8 @@ def load_config(root: Path | None = None) -> BridgeConfig:
         question_timeout_ms=_env_int(env_file, "DSH_BRIDGE_QUESTION_TIMEOUT_MS", 900_000),
         projects_root=projects,
         standalone_dir=standalone,
+        antigravity_projects_root=_env_path(env_file, "ANTIGRAVITY_BRIDGE_PROJECTS_ROOT"),
+        antigravity_standalone_dir=_env_path(env_file, "ANTIGRAVITY_BRIDGE_STANDALONE_DIR"),
         local_ui=_env_bool(env_file, "DSH_BRIDGE_LOCAL_UI", True),
         feishu_enabled=_env_bool(env_file, "DSH_BRIDGE_FEISHU", False),
         cloud_enabled=_env_bool(env_file, "DSH_BRIDGE_CLOUD", False),

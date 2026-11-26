@@ -81,7 +81,7 @@ class AttachmentStore:
         self.max_bytes = max_bytes
         self.max_batch_bytes = max_batch_bytes
 
-    def stage(self, task_key: str, files: list[dict[str, Any]]) -> tuple[list[StagedFile], list[dict[str, str]]]:
+    def stage(self, task_key: str, files: list[dict[str, Any]], *, persist_images: bool = False) -> tuple[list[StagedFile], list[dict[str, str]]]:
         """Persist uploads for one task.
 
         Returns staged non-image files plus the encoded image blocks accepted for
@@ -116,7 +116,7 @@ class AttachmentStore:
                 raise AttachmentError(f"附件总量超过 {self.max_batch_bytes // (1024 * 1024)} MB 限制")
             suffix = Path(name).suffix.lower()
             mime = str(raw.get("mime") or IMAGE_MIME.get(suffix) or mimetypes.guess_type(name)[0] or "application/octet-stream")
-            if suffix in IMAGE_SUFFIXES:
+            if suffix in IMAGE_SUFFIXES and not persist_images:
                 images.append({"type": "image", "data": base64.b64encode(payload).decode("ascii"), "mimeType": IMAGE_MIME.get(suffix, mime)})
                 continue
             counter += 1

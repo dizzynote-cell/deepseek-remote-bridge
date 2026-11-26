@@ -5,7 +5,8 @@
  */
 (() => {
   const boot = window.DSH_BRIDGE || {};
-  const base = typeof boot.basePath === 'string' && boot.basePath ? boot.basePath : '/';
+  const base = typeof boot.basePath === 'string' && boot.basePath ? boot.basePath :
+    document.currentScript?.hasAttribute('data-relative-base') ? new URL('.', document.currentScript.src).pathname : '/';
   const normalized = base.endsWith('/') ? base : base + '/';
   window.DSH_BRIDGE = Object.assign({ basePath: normalized }, boot);
   window.bridgeUrl = path => {

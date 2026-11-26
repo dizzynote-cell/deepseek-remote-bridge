@@ -45,7 +45,7 @@ class NewWorkspaceTests(unittest.TestCase):
 
         def create(cwd, blocks, **kwargs):
             self.assertTrue(Path(cwd).is_dir())
-            submitted.append(cwd)
+            submitted.append((kwargs['model'], kwargs['effort'], kwargs['preset']))
             return SimpleNamespace(id='task-test', session_id=kwargs['session_id'], detail={})
 
         state.tasks.create_session = create
@@ -57,13 +57,19 @@ class NewWorkspaceTests(unittest.TestCase):
         existing.mkdir(parents=True)
         for cwd in (config.projects_root / 'new-project', config.standalone_dir, existing):
             status, body, _ = get(url, method='POST', payload={
-                'op': 'new_thread', 'cwd': str(cwd), 'text': 'test', 'title': 'test'})
+                'op': 'new_thread', 'cwd': str(cwd), 'text': 'test', 'title': 'test',
+                'model': 'deepseek-v4-pro', 'effort': 'low', 'permissionPreset': 'workspace-write'})
             self.assertEqual(status, 200, body)
             self.assertEqual(json.loads(body)['taskId'], 'task-test')
         status, _, _ = get(url, method='POST', payload={
             'op': 'new_thread', 'cwd': str(self.root / 'forbidden'), 'text': 'test'})
         self.assertEqual(status, 403)
-        self.assertEqual(len(submitted), 3)
+        invalid = config.projects_root / 'invalid'
+        status, body, _ = get(url, method='POST', payload={
+            'op': 'new_thread', 'cwd': str(invalid), 'text': 'test', 'permissionPreset': 'missing'})
+        self.assertEqual(status, 400, body)
+        self.assertFalse(invalid.exists())
+        self.assertEqual(submitted, [('deepseek-v4-pro', 'low', 'workspace-write')] * 3)
         self.assertFalse((self.root / 'forbidden').exists())
 
     def test_forbidden_paths_do_not_create_directories(self):

@@ -94,15 +94,14 @@ Write-TrayLog "notifyicon created pid=$PID visible=$($notify.Visible) text=$($no
 $menu = New-Object System.Windows.Forms.ContextMenuStrip
 
 function Add-TrayItem {
-  param([string]$Text, [scriptblock]$OnClick, [switch]$Disabled)
+  param([string]$Text, [scriptblock]$OnClick, [switch]$Disabled, $TargetMenu = $menu)
   $item = New-Object System.Windows.Forms.ToolStripMenuItem
   $item.Text = $Text
   if ($Disabled) { $item.Enabled = $false }
   if ($OnClick) {
-    $action = $OnClick
-    $item.add_Click({ & $action })
+    $item.add_Click($OnClick)
   }
-  [void]$menu.Items.Add($item)
+  [void]$TargetMenu.Items.Add($item)
   return $item
 }
 
@@ -139,6 +138,27 @@ Add-TrayItem '退出托盘（不停止桥）' {
 $notify.ContextMenuStrip = $menu
 $notify.add_DoubleClick({ Write-TrayLog 'double-click open page'; Start-Process $url })
 
+# Antigravity uses the same bridge process and tray lifetime as DeepSeek.
+$antiNotify = $null
+$antiIconPath = Join-Path $root 'assets/antigravity.ico'
+$antiPage = Join-Path $root 'web/antigravity.html'
+if ((Test-Path -LiteralPath $antiPage) -and (Test-Path -LiteralPath $antiIconPath) -and
+    ((Get-Command agy.exe -ErrorAction SilentlyContinue) -or (Test-Path (Join-Path $env:LOCALAPPDATA 'agy/bin/agy.exe')))) {
+  $antiUrl = $url + 'antigravity.html'
+  $antiIcon = New-Object System.Drawing.Icon($antiIconPath, 32, 32)
+  $antiNotify = New-Object System.Windows.Forms.NotifyIcon
+  $antiNotify.Icon = $antiIcon
+  $antiNotify.Text = 'Antigravity Remote Bridge'
+  $antiMenu = New-Object System.Windows.Forms.ContextMenuStrip
+  $antiState = Add-TrayItem '共享桥状态：检查中…' -Disabled -TargetMenu $antiMenu
+  Add-TrayItem '打开 Antigravity 工作台' { Start-Process $antiUrl } -TargetMenu $antiMenu | Out-Null
+  Add-TrayItem '打开日志目录' { Start-Process explorer.exe $logDir } -TargetMenu $antiMenu | Out-Null
+  $antiNotify.ContextMenuStrip = $antiMenu
+  $antiNotify.add_DoubleClick({ Start-Process $antiUrl })
+  $antiNotify.Visible = $true
+  Write-TrayLog "Antigravity notifyicon created pid=$PID"
+}
+
 $timer = New-Object System.Windows.Forms.Timer
 $timer.Interval = 5000
 $timer.add_Tick({
@@ -147,9 +167,7 @@ $timer.add_Tick({
     if ($stateItem.Text -ne '状态：未运行') { Write-TrayLog 'status: bridge not running' }
     $stateItem.Text = '状态：未运行'
     $notify.Text = "DeepSeek Remote Bridge（未运行）`n双击打开页面"
-    return
-  }
-  if (Test-BridgeHealth -Root $root -TimeoutSeconds 2) {
+  } elseif (Test-BridgeHealth -Root $root -TimeoutSeconds 2) {
     if ($stateItem.Text -notlike "状态：运行中*") { Write-TrayLog ("status: running pid={0}" -f $process.ProcessId) }
     $stateItem.Text = "状态：运行中（PID $($process.ProcessId)）"
     $notify.Text = "DeepSeek Remote Bridge（运行中 PID $($process.ProcessId)）`n双击打开页面"
@@ -157,6 +175,10 @@ $timer.add_Tick({
     if ($stateItem.Text -notlike '状态：进程在*') { Write-TrayLog ("status: unhealthy pid={0}" -f $process.ProcessId) }
     $stateItem.Text = "状态：进程在，健康检查失败（PID $($process.ProcessId)）"
     $notify.Text = 'DeepSeek Remote Bridge（健康检查失败）'
+  }
+  if ($antiNotify) {
+    $antiState.Text = '共享桥' + $stateItem.Text
+    $antiNotify.Text = 'Antigravity Remote Bridge · ' + $stateItem.Text
   }
 })
 $timer.Start()
@@ -179,6 +201,9 @@ Write-TrayLog "message loop ended"
   # Dispose the icon even when initialization or the message loop fails.
   if ($timer) { $timer.Stop(); $timer.Dispose() }
   if ($notify) { $notify.Visible = $false; $notify.Dispose() }
+  if ($antiNotify) { $antiNotify.Visible = $false; $antiNotify.Dispose() }
+  if ($antiMenu) { $antiMenu.Dispose() }
+  if ($antiIcon) { $antiIcon.Dispose() }
   if ($assets) {
     foreach ($asset in @($assets.Icon, $assets.Bitmap, $assets.Font, $assets.Brush, $assets.Path)) {
       if ($asset) { $asset.Dispose() }

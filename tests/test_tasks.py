@@ -86,6 +86,70 @@ def completed_events(message_id="message-new", turn=1, finish="completed"):
 
 
 class TaskTests(unittest.TestCase):
+    def test_creation_checks_permission_on_selected_runtime_before_prompt(self):
+        from unittest.mock import patch
+        from app.dsh_adapter import AdapterError
+
+        preset = 'workspace-write'
+        for result in ({'current': preset}, {'current': 'danger-full-access'}, AdapterError('offline')):
+            with self.subTest(result=result):
+                tasks, handle, _ = runner()
+                handle.adapter_port, handle.adapter_token = 10001, 'test-token'
+
+                def apply(session_id, chosen):
+                    self.assertEqual((session_id, chosen), ('test-session', preset))
+                    self.assertEqual([name for name, _ in handle.calls], ['session/working-directory/set'])
+                    if isinstance(result, Exception):
+                        raise result
+                    return result
+
+                with patch('app.tasks.AdapterClient') as client, patch.object(tasks, '_follow'):
+                    client.return_value.set_permission.side_effect = apply
+                    args = dict(session_id='test-session', provider='example', model='custom',
+                                effort='medium', preset=preset)
+                    if result == {'current': preset}:
+                        tasks.create_session(FakeRecord.cwd, [], **args)
+                        self.assertEqual(handle.calls[-1][0], 'session/prompt')
+                    else:
+                        with self.assertRaises(TaskRejected) as caught:
+                            tasks.create_session(FakeRecord.cwd, [], **args)
+                        self.assertEqual(caught.exception.code, 'permission_failed')
+                        self.assertNotIn('session/prompt', [name for name, _ in handle.calls])
+                        self.assertFalse(tasks.is_running('test-session'))
+                    client.assert_called_once_with(handle.adapter_port, handle.adapter_token)
+                    client.return_value.set_permission.assert_called_once()
+
+    def test_custom_provider_route_is_kept_when_creating_and_reloading(self):
+        import tempfile
+        from pathlib import Path
+        from unittest.mock import patch
+        from app.dsh_runtime import RouteKey
+        with tempfile.TemporaryDirectory() as directory:
+            tasks, handle, catalog = runner()
+            tasks.routes_path = Path(directory) / 'routes.json'
+            acquired = []
+            tasks.pool.acquire = lambda key=None: (acquired.append(key) or handle)
+            with patch.object(tasks, '_follow'):
+                task = tasks.create_session(FakeRecord.cwd, [{'type':'text','text':'test'}],
+                                            provider='example', model='custom', effort='medium')
+            expected = RouteKey('example','custom','medium')
+            self.assertEqual(acquired, [expected])
+            self.assertEqual(tasks.route_for(task.session_id), expected)
+            reloaded = TaskRunner(FakeConfig(), tasks.pool, catalog, None, routes_path=tasks.routes_path)
+            self.assertEqual(reloaded.route_for(task.session_id), expected)
+
+    def test_switch_uses_selected_provider_for_same_model_id(self):
+        from app.dsh_runtime import RouteKey
+        tasks, handle, catalog = runner()
+        released, acquired = [], []
+        tasks.pool.release = released.append
+        tasks.pool.acquire = lambda key=None: (acquired.append(key) or handle)
+        target = tasks.switch_route('session-demo', 'deepseek-flash', 'low', provider='example')
+        self.assertEqual(target, RouteKey('example', 'deepseek-flash', 'low'))
+        self.assertEqual(acquired, [target])
+        self.assertEqual(released, [tasks.default_route()])
+        self.assertEqual(tasks.route_for('session-demo'), target)
+
     def test_missing_final_history_is_unknown_instead_of_success(self):
         from unittest.mock import patch
         tasks, handle, catalog = runner()
